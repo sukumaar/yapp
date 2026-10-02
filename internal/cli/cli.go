@@ -66,7 +66,7 @@ func Execute(ctx context.Context, args []string, stdout io.Writer) error {
 }
 
 func writeHelp(w io.Writer) error {
-	const help = `YAPP - Yet Another Package Puller
+	const help = `YAPP - Yet Another Package Provisioner
 
 Usage:
   yapp <command> [arguments]

@@ -1,6 +1,6 @@
 # YAPP
 
-**Yet Another Package Puller** is a package manager in development for the tools developers use every day. YAPP aims to make it simple to install and update tools such as Java, Scala, and Maven, while keeping them together under `~/.yapp`.
+**Yet Another Package Provisioner** is a package manager in development for the tools developers use every day. YAPP aims to make it simple to install and update tools such as Java, Scala, and Maven, while keeping them together under `~/.yapp`.
 
 ## Why YAPP?
 
