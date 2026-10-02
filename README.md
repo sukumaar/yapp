@@ -15,17 +15,16 @@ Tool downloads will come from a shared catalog hosted on GitHub. That catalog ca
 YAPP's commands will be familiar if you have used Homebrew:
 
 ```sh
-yapp install maven
-yapp list
-yapp outdated
-yapp upgrade
+yapp install jdk25
+yapp version
 ```
 
-The planned commands include:
+The first available install target is Eclipse Temurin JDK 25 for Linux amd64. Installing it creates `~/.yapp`, verifies the download, and configures `JAVA_HOME` and `PATH` through your Bash or Zsh startup file. Open a new shell or source your startup file after installation. YAPP does not install other apps' dependencies for you.
+
+Other commands are planned:
 
 | Command | What it does |
 | --- | --- |
-| `yapp install <app>` | Install a tool, such as Java, Scala, or Maven. |
 | `yapp uninstall <app>` | Remove a tool installed by YAPP. |
 | `yapp list` | See the tools you have installed. |
 | `yapp search <term>` | Find a tool in the catalog. |
@@ -40,7 +39,7 @@ Commands and behavior are still being designed and may change.
 
 ## Installation
 
-YAPP is in early development. The CLI scaffold can show help and version information, but package installation and management are not implemented yet.
+YAPP is in early development. Temurin JDK 25 installation is implemented for Linux amd64; other app-management commands and platform artifacts are still in progress.
 
 ## License
 

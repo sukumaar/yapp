@@ -19,7 +19,7 @@ func run() int {
 	defer stop()
 
 	if err := cli.Execute(ctx, os.Args[1:], os.Stdout); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "yapp:", err)
+		fmt.Fprintln(os.Stderr, "yapp:", err)
 		return cli.ExitCode(err)
 	}
 	return 0

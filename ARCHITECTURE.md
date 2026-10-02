@@ -1,21 +1,25 @@
 # YAPP Architecture
 
-This document is for contributors and maintainers. It records the current design direction for YAPP; it is not a specification for implemented behavior. All formats and interfaces below are proposals until the implementation establishes them.
+This document is for contributors and maintainers. It records the current design and implementation status; proposed behavior is identified as such.
 
 ## Go project structure
 
-YAPP is implemented in Go as a single CLI binary, with no third-party dependencies in the initial scaffold. The repository uses a small `cmd/` and `internal/` layout:
+YAPP is implemented in Go as a single CLI binary. The repository uses a small `cmd/` and `internal/` layout:
 
 ```text
 cmd/yapp/                 # Executable entry point and process lifecycle
 internal/cli/             # Command parsing and user-facing CLI behavior
 internal/buildinfo/       # Version metadata embedded at build time
+internal/catalog/         # Validated, embedded YAML app catalog
+internal/installer/       # HTTPS download, checksum verification, safe extraction
+internal/state/           # Local installation registry
+internal/shellenv/        # Bash/Zsh PATH integration
 Makefile                  # Local build with linker-injected version metadata
 ```
 
 Keep application packages under `internal/` until there is a concrete, stable API that other Go modules need to import. Add focused packages as real responsibilities are implemented; avoid placeholder packages and unnecessary abstraction layers. The module path is `github.com/sukumaar/yapp`.
 
-The initial module targets Go 1.27. Release builds should embed version, commit, and build-time metadata using linker flags. The CLI scaffold currently implements help and version; package-management commands are explicitly unavailable until built.
+The initial module targets Go 1.27. Release builds should embed version, commit, and build-time metadata using linker flags. The CLI currently implements help, version, and installation of the catalog's Linux amd64 JDK 25 artifact. Other package-management commands and platform artifacts remain unimplemented.
 
 ## Goals
 
@@ -38,37 +42,40 @@ The CLI reads the catalog to select an app version and matching artifact, downlo
 
 ```text
 YAPP repository/
-└── catalog.yaml           # Proposed shared app catalog
+└── internal/catalog/catalog.yaml # Shared catalog source in this repository
 
 ~/.yapp/
-├── .yapp_config           # Proposed local install state (JSON)
+├── .yapp_config           # Local install state (JSON)
+├── yapp-env.sh            # Generated JAVA_HOME and PATH settings
 ├── apps/                  # YAPP-managed installations
 └── cache/                 # Optional cached downloads
 ```
 
-Directory names beyond `~/.yapp` and `.yapp_config` are proposals.
+The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. The initial JDK entry supports Linux amd64 only.
 
 ## Shared app catalog
 
-The catalog will live in this GitHub repository so contributors can add apps and maintain download links through pull requests. YAML is the current candidate format because catalog entries are expected to be reviewed and edited by people. The schema should remain small, explicit, and validated before entries are accepted.
+The catalog lives in `internal/catalog/catalog.yaml` in this GitHub repository so contributors can add apps and maintain download links through pull requests. It is embedded into release binaries. YAML is used because catalog entries are reviewed and edited by people; the schema is strict and unknown fields are rejected.
 
 An illustrative entry:
 
 ```yaml
 apps:
-  maven:
-    versions:
-      "3.9.9":
-        artifacts:
-          - os: darwin
-            arch: arm64
-            url: https://example.org/apache-maven-3.9.9-bin.tar.gz
-            sha256: REPLACE_WITH_VERIFIED_SHA256
+  jdk25:
+    name: Eclipse Temurin JDK 25
+    version: 25.0.4.1+1
+    release_url: https://github.com/adoptium/temurin25-binaries/releases/tag/jdk-25.0.4.1%2B1
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz
+        sha256: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
+        strip_components: 1
+    install_path: apps/jdk25/25.0.4.1+1
 ```
 
-This is a sketch, not a finalized schema. The actual catalog needs to define version selection, supported operating systems and architectures, archive handling, and executable locations. Catalog entries should use upstream artifact URLs and verified hashes. The catalog may document an app's external runtime needs for users, but YAPP will not use them to install or gate apps.
-
-JSON is an alternative if a standard-library-only parser is preferred over easier hand editing. TOML is also readable, but requires an additional parser in Go. The choice should be made before the catalog becomes a public compatibility contract.
+Each entry pins one app version and provides platform-specific artifacts. The first entry supports Linux amd64. Catalog validation currently accepts HTTPS `tar.gz` artifacts, SHA-256 hashes, and a safe relative install path. YAPP verifies the archive before extraction. Catalog entries should use upstream artifact URLs and verified hashes. The catalog may document an app's external runtime needs for users, but YAPP will not use them to install or gate apps.
 
 ## Local state
 
@@ -80,7 +87,7 @@ The local state file will be `~/.yapp/.yapp_config`. It should record enough inf
 - Platform and architecture
 - Install time
 
-JSON is the current candidate format because this file is generated by YAPP and Go includes JSON support in its standard library. The local state is machine-specific and must not be committed to the shared catalog repository. Writes should be atomic so an interrupted install does not leave a partially written state file.
+JSON is used because this file is generated by YAPP and Go includes JSON support in its standard library. The local state is machine-specific and must not be committed to the shared catalog repository. Writes are atomic so an interrupted install does not leave a partially written state file.
 
 Example shape (illustrative):
 
@@ -88,13 +95,15 @@ Example shape (illustrative):
 {
   "schemaVersion": 1,
   "apps": {
-    "maven": {
-      "version": "3.9.9",
-      "path": "apps/maven/3.9.9",
-      "artifact": {
-        "url": "https://example.org/apache-maven-3.9.9-bin.tar.gz",
-        "sha256": "REPLACE_WITH_VERIFIED_SHA256"
-      }
+    "jdk25": {
+      "name": "Eclipse Temurin JDK 25",
+      "version": "25.0.4.1+1",
+      "path": "apps/jdk25/25.0.4.1+1",
+      "artifactUrl": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz",
+      "sha256": "dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e",
+      "os": "linux",
+      "arch": "amd64",
+      "installedAt": "2026-10-01T00:00:00Z"
     }
   }
 }
@@ -112,7 +121,7 @@ The proposed install flow is:
 
 YAPP does not install an app's runtime dependencies or reject an app because those dependencies are absent. For example, installing Maven must succeed even if Java is not installed; running Maven may still require the user to install and configure Java separately.
 
-YAPP should manage its own stable command directory (for example, `~/.yapp/bin`) and ensure that directory is on `PATH`. The mechanism for setting up that `PATH` entry, handling multiple versions of a command, and removing command links during uninstall remains to be designed. YAPP should not overwrite unrelated user `PATH` entries.
+For the JDK install, YAPP writes `~/.yapp/yapp-env.sh` with `JAVA_HOME` and a `PATH` entry for the selected JDK's `bin` directory. It adds an idempotent source block to the startup file for the shell named by `$SHELL` (`~/.bashrc` or `~/.zshrc`). It preserves existing `PATH` entries. Handling multiple versions of a command remains to be designed.
 
 ## CLI direction
 
