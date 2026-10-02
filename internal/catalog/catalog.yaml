@@ -2,6 +2,7 @@ apps:
   jdk25:
     name: Eclipse Temurin JDK 25
     version: 25.0.4.1+1
+    semantic_version: "25.0.4"
     release_url: https://github.com/adoptium/temurin25-binaries/releases/tag/jdk-25.0.4.1%2B1
     artifacts:
       - os: linux
@@ -11,3 +12,30 @@ apps:
         sha256: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
         strip_components: 1
     install_path: apps/jdk25/25.0.4.1+1
+    executables:
+      - bin/java
+    environment:
+      variables:
+        JAVA_HOME: .
+      paths:
+        - bin
+  maven:
+    name: Apache Maven
+    version: 3.9.16
+    release_url: https://maven.apache.org/download.cgi
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://downloads.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
+        sha256: 80ffca22aed9e8b9713a232f3394fd81d7f20322df75efdb2b047dbd3e3a23bb
+        strip_components: 1
+    install_path: apps/maven/3.9.16
+    executables:
+      - bin/mvn
+    environment:
+      paths:
+        - bin
+    depends_on:
+      - name: jdk25
+        version: "25.x"

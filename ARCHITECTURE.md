@@ -64,6 +64,7 @@ apps:
   jdk25:
     name: Eclipse Temurin JDK 25
     version: 25.0.4.1+1
+    semantic_version: "25.0.4"
     release_url: https://github.com/adoptium/temurin25-binaries/releases/tag/jdk-25.0.4.1%2B1
     artifacts:
       - os: linux
@@ -73,9 +74,32 @@ apps:
         sha256: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
         strip_components: 1
     install_path: apps/jdk25/25.0.4.1+1
+    executables:
+      - bin/java
+    environment:
+      variables:
+        JAVA_HOME: .
+      paths:
+        - bin
 ```
 
-Each entry pins one app version and provides platform-specific artifacts. The first entry supports Linux amd64. Catalog validation currently accepts HTTPS `tar.gz` artifacts, SHA-256 hashes, and a safe relative install path. YAPP verifies the archive before extraction. Catalog entries should use upstream artifact URLs and verified hashes. The catalog may document an app's external runtime needs for users, but YAPP will not use them to install or gate apps.
+Dependencies use catalog/CLI IDs and npm-style semantic version constraints:
+
+```yaml
+depends_on:
+  - name: jdk25
+    version: ">=17 <26"
+  - name: maven
+    version: "^3.9.0"
+```
+
+Matching uses `github.com/Masterminds/semver/v3`. Supported forms include exact versions (`3.9.16`), comparisons (`>=17`, `<26`), caret (`^3.9.0`), tilde (`~3.9.0`), wildcards (`17.x`), hyphen ranges, space/comma-separated AND, and `||` OR. Partial versions such as `17` describe the 17.x range; a full three-part version pins a semantic version. Prereleases are excluded by default unless the constraint opts into them. SemVer build metadata does not affect matching. This is npm-style range support, not a guarantee of equivalence with every node-semver edge case or npm package-spec syntax (tags, Git URLs, etc.).
+
+Artifact `version` remains the exact upstream release identifier. An optional `semantic_version` explicitly supplies a full SemVer compatibility version for non-SemVer releases. For example, JDK release `25.0.4.1+1` declares `semantic_version: "25.0.4"`; its fourth component and build distinguish artifacts, not compatibility ranges. No implicit truncation occurs. Exact dependency pins use the semantic version, while the catalog version, URL, and checksum pin the full artifact.
+
+Catalog validation requires its offered provider version to satisfy each dependency range and rejects unknown dependencies and cycles. At installation time, matching uses the recorded semantic version (or a valid recorded SemVer release). An old registry can reuse a catalog mapping only when its release, artifact URL, and checksum still match. System executables found through PATH or environment variables have unverified versions; their presence is not treated as proof of compatibility. Requirements are checked per dependency edge, including transitive requirements.
+
+Dependencies appear before their dependents on PATH. Missing, incompatible, or unverified installed dependencies produce advice only; YAPP never installs them automatically or blocks an app installation because they are absent. Catalog entries should use upstream artifact URLs and verified hashes.
 
 ## Local state
 
@@ -119,16 +143,16 @@ The proposed install flow is:
 4. Install under `~/.yapp` and update `.yapp_config` only after successful installation.
 5. Expose the app's commands through a YAPP-managed directory on `PATH`.
 
-YAPP does not install an app's runtime dependencies or reject an app because those dependencies are absent. For example, installing Maven must succeed even if Java is not installed; running Maven may still require the user to install and configure Java separately.
+YAPP does not install an app's dependencies or reject an app because those apps are absent. After installation, YAPP may check dependency executables and print a `yapp install <app>` suggestion for any missing dependency. It never runs that command itself.
 
-For the JDK install, YAPP writes `~/.yapp/yapp-env.sh` with `JAVA_HOME` and a `PATH` entry for the selected JDK's `bin` directory. It adds an idempotent source block to the startup file for the shell named by `$SHELL` (`~/.bashrc` or `~/.zshrc`). It preserves existing `PATH` entries. Handling multiple versions of a command remains to be designed.
+YAPP writes `~/.yapp/yapp-env.sh` with catalog-provided environment variables and PATH entries for installed app binaries. Dependencies appear before their dependents, and existing PATH entries are preserved. It adds an idempotent source block to the startup file for the shell named by `$SHELL` (`~/.bashrc` or `~/.zshrc`).
 
 ## CLI direction
 
 Command names are intended to feel familiar to Homebrew users. The current public command proposal is listed in the [README](README.md). The main command responsibilities are:
 
 - `install`: select the app artifact, fetch, verify, install, expose its commands on `PATH`, and record state. It does not install dependencies.
-- `uninstall`: remove a YAPP-managed installation and update local state.
+- `uninstall`: remove the recorded app directory under `~/.yapp/apps`, update local state, and regenerate the shell environment for remaining apps. It refuses unsafe paths and symlinked install directories.
 - `list`, `info`, and `search`: inspect installed apps and the shared catalog.
 - `update`: refresh the local catalog copy.
 - `outdated` and `upgrade`: compare installed versions with catalog versions and apply selected updates.

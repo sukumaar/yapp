@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/sukumaar/yapp/internal/versionconstraint"
 )
 
 const schemaVersion = 1
@@ -25,14 +27,15 @@ type State struct {
 
 // Install records a YAPP-managed app installation.
 type Install struct {
-	Name        string    `json:"name"`
-	Version     string    `json:"version"`
-	Path        string    `json:"path"`
-	ArtifactURL string    `json:"artifactUrl"`
-	SHA256      string    `json:"sha256"`
-	OS          string    `json:"os"`
-	Arch        string    `json:"arch"`
-	InstalledAt time.Time `json:"installedAt"`
+	Name            string    `json:"name"`
+	Version         string    `json:"version"`
+	SemanticVersion string    `json:"semanticVersion,omitempty"`
+	Path            string    `json:"path"`
+	ArtifactURL     string    `json:"artifactUrl"`
+	SHA256          string    `json:"sha256"`
+	OS              string    `json:"os"`
+	Arch            string    `json:"arch"`
+	InstalledAt     time.Time `json:"installedAt"`
 }
 
 // Load reads the local registry, returning an empty state when it does not exist.
@@ -83,6 +86,11 @@ func Load(home string) (State, error) {
 		result.Apps = make(map[string]Install)
 	}
 	for appID, install := range result.Apps {
+		if install.SemanticVersion != "" {
+			if err := versionconstraint.ValidateVersion(install.SemanticVersion); err != nil {
+				return State{}, fmt.Errorf("invalid recorded semantic version for %q: %w", appID, err)
+			}
+		}
 		if strings.TrimSpace(appID) == "" || strings.ContainsAny(appID, `/\\`) || appID == "." || appID == ".." {
 			return State{}, fmt.Errorf("local state has invalid app identifier %q", appID)
 		}
@@ -95,6 +103,11 @@ func Load(home string) (State, error) {
 
 // Record adds or updates an installed app in the local registry.
 func Record(home, appID string, install Install) error {
+	if install.SemanticVersion != "" {
+		if err := versionconstraint.ValidateVersion(install.SemanticVersion); err != nil {
+			return fmt.Errorf("invalid semantic version: %w", err)
+		}
+	}
 	if strings.TrimSpace(appID) == "" || strings.ContainsAny(appID, `/\\`) || appID == "." || appID == ".." {
 		return fmt.Errorf("invalid app identifier %q", appID)
 	}
@@ -109,6 +122,30 @@ func Record(home, appID string, install Install) error {
 		return err
 	}
 	current.Apps[appID] = install
+	data, err := json.MarshalIndent(current, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode local state: %w", err)
+	}
+	data = append(data, '\n')
+	if err := atomicWrite(filepath.Join(home, ".yapp_config"), data, 0o600); err != nil {
+		return fmt.Errorf("write local state: %w", err)
+	}
+	return nil
+}
+
+// Remove deletes an app from the local installation registry.
+func Remove(home, appID string) error {
+	if strings.TrimSpace(appID) == "" || strings.ContainsAny(appID, `/\\`) || appID == "." || appID == ".." {
+		return fmt.Errorf("invalid app identifier %q", appID)
+	}
+	current, err := Load(home)
+	if err != nil {
+		return err
+	}
+	if _, exists := current.Apps[appID]; !exists {
+		return fmt.Errorf("app %q is not recorded as installed", appID)
+	}
+	delete(current.Apps, appID)
 	data, err := json.MarshalIndent(current, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode local state: %w", err)

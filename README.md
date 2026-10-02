@@ -16,16 +16,19 @@ YAPP's commands will be familiar if you have used Homebrew:
 
 ```sh
 yapp install jdk25
+yapp install maven
+yapp uninstall maven
 yapp version
 ```
 
-The first available install target is Eclipse Temurin JDK 25 for Linux amd64. Installing it creates `~/.yapp`, verifies the download, and configures `JAVA_HOME` and `PATH` through your Bash or Zsh startup file. Open a new shell or source your startup file after installation. YAPP does not install other apps' dependencies for you.
+Available install targets are Eclipse Temurin JDK 25 and Apache Maven 3.9.16 for Linux amd64. Installing either creates `~/.yapp`, verifies the download, and configures environment variables and `PATH` through your Bash or Zsh startup file. When both are installed, Java is placed before Maven on `PATH`. Open a new shell or source your startup file after installation. YAPP never installs dependencies automatically. Installing Maven does not require Java to already be installed; if Java is not detected, YAPP suggests the `yapp install jdk25` command.
+
+Use `yapp uninstall <app>` to remove an app installed by YAPP and refresh its shell configuration.
 
 Other commands are planned:
 
 | Command | What it does |
 | --- | --- |
-| `yapp uninstall <app>` | Remove a tool installed by YAPP. |
 | `yapp list` | See the tools you have installed. |
 | `yapp search <term>` | Find a tool in the catalog. |
 | `yapp info <app>` | View details about a tool. |

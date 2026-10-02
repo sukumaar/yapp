@@ -29,7 +29,7 @@ const (
 
 // Install downloads and installs one catalog app under the YAPP home directory.
 // It never executes code from the downloaded archive.
-func Install(ctx context.Context, home, appID string, app catalog.App, artifact catalog.Artifact) (state.Install, string, error) {
+func Install(ctx context.Context, home string, app catalog.App, artifact catalog.Artifact) (state.Install, string, error) {
 	if err := ensureRealDir(home, 0o700); err != nil {
 		return state.Install{}, "", err
 	}
@@ -72,8 +72,8 @@ func Install(ctx context.Context, home, appID string, app catalog.App, artifact 
 	if err := extractTarGzip(archivePath, stage, artifact.StripComponents); err != nil {
 		return state.Install{}, "", fmt.Errorf("extract %s: %w", app.Name, err)
 	}
-	if appID == "jdk25" {
-		if err := verifyJavaBinary(filepath.Join(stage, "bin", "java")); err != nil {
+	for _, executable := range app.Executables {
+		if err := verifyExecutable(filepath.Join(stage, filepath.FromSlash(executable)), executable); err != nil {
 			return state.Install{}, "", err
 		}
 	}
@@ -86,16 +86,64 @@ func Install(ctx context.Context, home, appID string, app catalog.App, artifact 
 	}
 
 	record := state.Install{
-		Name:        app.Name,
-		Version:     app.Version,
-		Path:        filepath.ToSlash(app.InstallPath),
-		ArtifactURL: artifact.URL,
-		SHA256:      checksum,
-		OS:          artifact.OS,
-		Arch:        artifact.Arch,
-		InstalledAt: time.Now().UTC(),
+		Name:            app.Name,
+		Version:         app.Version,
+		SemanticVersion: app.SemanticVersion,
+		Path:            filepath.ToSlash(app.InstallPath),
+		ArtifactURL:     artifact.URL,
+		SHA256:          checksum,
+		OS:              artifact.OS,
+		Arch:            artifact.Arch,
+		InstalledAt:     time.Now().UTC(),
 	}
 	return record, installPath, nil
+}
+
+// Uninstall removes only a recorded app directory beneath the YAPP apps tree.
+func Uninstall(home, appID string, install state.Install) error {
+	if err := ensureExistingRealDir(home); err != nil {
+		return err
+	}
+	if !safeRelativePath(appID) || !safeRelativePath(install.Path) || !strings.HasPrefix(filepath.ToSlash(install.Path), "apps/"+filepath.ToSlash(appID)+"/") {
+		return fmt.Errorf("refusing to uninstall unsafe recorded path %q", install.Path)
+	}
+	components := strings.Split(filepath.ToSlash(install.Path), "/")
+	current := home
+	for index, component := range components {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return fmt.Errorf("inspect recorded install path %s: %w", current, err)
+		}
+		if index < len(components)-1 {
+			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("refusing to uninstall through a non-directory or symlink: %s", current)
+			}
+			continue
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to uninstall a non-directory or symlink: %s", current)
+		}
+	}
+	parent := filepath.Dir(current)
+	if err := os.RemoveAll(current); err != nil {
+		return fmt.Errorf("remove app directory %s: %w", current, err)
+	}
+	if err := syncDirectory(parent); err != nil {
+		return fmt.Errorf("sync app directory after uninstall: %w", err)
+	}
+	return nil
+}
+
+func ensureExistingRealDir(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return fmt.Errorf("inspect YAPP home: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("YAPP home must be a real directory: %s", path)
+	}
+	return nil
 }
 
 func download(ctx context.Context, cacheDir string, artifact catalog.Artifact) (string, string, error) {
@@ -388,13 +436,13 @@ func safeRelativePath(value string) bool {
 	return true
 }
 
-func verifyJavaBinary(path string) error {
+func verifyExecutable(path, name string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return fmt.Errorf("archive does not contain bin/java: %w", err)
+		return fmt.Errorf("archive does not contain %s: %w", name, err)
 	}
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return fmt.Errorf("archive bin/java is not an executable regular file")
+		return fmt.Errorf("archive %s is not an executable regular file", name)
 	}
 	return nil
 }
