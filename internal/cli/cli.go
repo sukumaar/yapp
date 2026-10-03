@@ -102,7 +102,7 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	app, ok := catalogData.Apps[args[0]]
+	appID, app, ok := catalogData.ResolveApp(args[0])
 	if !ok {
 		return &ExitError{Code: 2, Message: fmt.Sprintf("unknown app %q", args[0])}
 	}
@@ -116,7 +116,7 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("read YAPP installation state: %w", err)
 	}
 	err = progressui.Run(ctx, stdout, "Installing "+app.Name+" "+app.Version, func(report progressui.Reporter) error {
-		if installed, exists := current.Apps[args[0]]; exists {
+		if installed, exists := current.Apps[appID]; exists {
 			report("Checking existing installation", 0, 0)
 			if installed.Version != app.Version || installed.Path != filepath.ToSlash(app.InstallPath) || installed.ArtifactURL != artifact.URL || installed.SHA256 != artifact.SHA256 {
 				return fmt.Errorf("%s is already installed in a different state; upgrades are not implemented yet", app.Name)
@@ -142,10 +142,10 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 				return err
 			}
 			installed.LinkedBinaries = app.LinkedBinaries()
-			if err := state.Record(yappHome, args[0], installed); err != nil {
+			if err := state.Record(yappHome, appID, installed); err != nil {
 				return err
 			}
-			current.Apps[args[0]] = installed
+			current.Apps[appID] = installed
 			report("Updating shell environment", 0, 0)
 			if err := configureShell(userHome, shell, catalogData, current, report); err != nil {
 				return fmt.Errorf("%s is installed, but shell configuration failed: %w", app.Name, err)
@@ -159,10 +159,10 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 			return err
 		}
 		report("Recording installation state", 0, 0)
-		if err := state.Record(yappHome, args[0], installRecord); err != nil {
+		if err := state.Record(yappHome, appID, installRecord); err != nil {
 			return fmt.Errorf("installed %s at %s, but could not record local state: %w", app.Name, installPath, err)
 		}
-		current.Apps[args[0]] = installRecord
+		current.Apps[appID] = installRecord
 		report("Creating command links", 0, 0)
 		if err := commandlinks.Link(yappHome, installRecord.Path, installRecord.LinkedBinaries); err != nil {
 			return fmt.Errorf("installed %s, but command linking failed: %w", app.Name, err)
@@ -229,17 +229,17 @@ func uninstallApp(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("read YAPP installation state: %w", err)
 	}
-	record, ok := installed.Apps[args[0]]
-	if !ok {
-		return &ExitError{Code: 1, Message: fmt.Sprintf("%q is not installed by YAPP", args[0])}
-	}
 	catalogData, err := catalog.Default()
 	if err != nil {
 		return err
 	}
-	app, ok := catalogData.Apps[args[0]]
+	appID, app, ok := catalogData.ResolveApp(args[0])
 	if !ok {
-		return fmt.Errorf("cannot safely uninstall %q because it is no longer in the catalog", args[0])
+		return &ExitError{Code: 2, Message: fmt.Sprintf("unknown app %q", args[0])}
+	}
+	record, ok := installed.Apps[appID]
+	if !ok {
+		return &ExitError{Code: 1, Message: fmt.Sprintf("%q is not installed by YAPP", args[0])}
 	}
 	return progressui.Run(ctx, stdout, "Uninstalling "+record.Name+" "+record.Version, func(report progressui.Reporter) error {
 		report("Removing command links", 0, 0)
@@ -251,10 +251,10 @@ func uninstallApp(ctx context.Context, args []string, stdout io.Writer) error {
 			return err
 		}
 		report("Removing installation state", 0, 0)
-		if err := state.Remove(yappHome, args[0]); err != nil {
+		if err := state.Remove(yappHome, appID); err != nil {
 			return fmt.Errorf("removed %s files but could not update local state: %w", record.Name, err)
 		}
-		delete(installed.Apps, args[0])
+		delete(installed.Apps, appID)
 		report("Updating shell environment", 0, 0)
 		if err := configureShell(userHome, shell, catalogData, installed, report); err != nil {
 			return fmt.Errorf("uninstalled %s, but could not update shell configuration: %w", record.Name, err)
@@ -272,7 +272,7 @@ func infoApp(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	app, ok := catalogData.Apps[args[0]]
+	appID, app, ok := catalogData.ResolveApp(args[0])
 	if !ok {
 		return &ExitError{Code: 2, Message: fmt.Sprintf("unknown app %q", args[0])}
 	}
@@ -284,8 +284,8 @@ func infoApp(args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("read YAPP installation state: %w", err)
 	}
-	record, isInstalled := installed.Apps[args[0]]
-	return writeAppInfo(stdout, args[0], app, record, isInstalled)
+	record, isInstalled := installed.Apps[appID]
+	return writeAppInfo(stdout, appID, app, record, isInstalled)
 }
 
 func writeAppInfo(w io.Writer, id string, app catalog.App, installed state.Install, isInstalled bool) error {
@@ -354,19 +354,22 @@ func writeDependencyHints(w io.Writer, yappHome string, catalogData catalog.Cata
 			return nil
 		}
 		visited[requirement] = true
-		dependency := catalogData.Apps[requirement.Name]
+		providerID, dependency, err := catalogData.ResolveDependency(requirement)
+		if err != nil {
+			return fmt.Errorf("resolve dependency %q: %w", requirement.Name, err)
+		}
 		for _, required := range dependency.DependsOn {
 			if err := visit(required); err != nil {
 				return err
 			}
 		}
-		if reason := dependencyStatus(yappHome, requirement, dependency, installed); reason != "" {
-			_, err := fmt.Fprintf(w, "Dependency %s (%s): %s. YAPP provides %s; install with: yapp install %s\n", requirement.Name, requirement.Version, reason, dependency.Version, requirement.Name)
+		if reason := dependencyStatus(yappHome, providerID, requirement, dependency, installed); reason != "" {
+			_, err := fmt.Fprintf(w, "Dependency %s (%s): %s. YAPP provides %s; install with: yapp install %s\n", requirement.Name, requirement.Version, reason, dependency.Version, providerID)
 			if err != nil {
 				return fmt.Errorf("write dependency suggestion: %w", err)
 			}
-			if _, exists := installed.Apps[requirement.Name]; exists {
-				_, err = fmt.Fprintf(w, "Replacing an existing YAPP installation currently requires: yapp uninstall %s, then yapp install %s\n", requirement.Name, requirement.Name)
+			if _, exists := installed.Apps[providerID]; exists {
+				_, err = fmt.Fprintf(w, "Replacing an existing YAPP installation currently requires: yapp uninstall %s, then yapp install %s\n", providerID, providerID)
 				if err != nil {
 					return fmt.Errorf("write dependency suggestion: %w", err)
 				}
@@ -384,8 +387,8 @@ func writeDependencyHints(w io.Writer, yappHome string, catalogData catalog.Cata
 
 // An empty status means the recorded version satisfies the requirement.
 // Finding a system executable alone cannot establish version compatibility.
-func dependencyStatus(yappHome string, requirement catalog.Dependency, app catalog.App, installed state.State) string {
-	if record, ok := installed.Apps[requirement.Name]; ok {
+func dependencyStatus(yappHome, providerID string, requirement catalog.Dependency, app catalog.App, installed state.State) string {
+	if record, ok := installed.Apps[providerID]; ok {
 		for _, executable := range app.Executables {
 			if !executableFile(filepath.Join(yappHome, filepath.FromSlash(record.Path), filepath.FromSlash(executable))) {
 				return "recorded installation has missing executables"

@@ -33,14 +33,14 @@ func TestDependencyStatus(t *testing.T) {
 			installed := state.State{Apps: map[string]state.Install{"runtime": {Version: tt.release, SemanticVersion: tt.semantic, Path: "apps/runtime/old", ArtifactURL: "url", SHA256: "hash"}}}
 			// A mismatched managed runtime on PATH must not override its registry version.
 			t.Setenv("PATH", filepath.Dir(binary))
-			got := dependencyStatus(home, requirement, app, installed)
+			got := dependencyStatus(home, "runtime", requirement, app, installed)
 			if (tt.want == "" && got != "") || (tt.want != "" && !strings.Contains(got, tt.want)) {
 				t.Fatalf("status=%q; want %q", got, tt.want)
 			}
 		})
 	}
 	t.Setenv("PATH", filepath.Dir(binary))
-	if got := dependencyStatus(home, requirement, app, state.State{}); !strings.Contains(got, "unverified") {
+	if got := dependencyStatus(home, "runtime", requirement, app, state.State{}); !strings.Contains(got, "unverified") {
 		t.Fatalf("external executable treated as compatible: %s", got)
 	}
 }

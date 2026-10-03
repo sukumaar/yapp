@@ -20,7 +20,7 @@ func TestConfigureWritesAndRemovesCatalogEnvironment(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, ".bashrc"), []byte(startup), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Configure(home, "bash", map[string]string{"JAVA_HOME": "apps/jdk25/25"}, []string{"bin"}, nil); err != nil {
+	if err := Configure(home, "bash", map[string]string{"JAVA_HOME": "apps/jdk/25"}, []string{"bin"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(home, ".bashrc"))
@@ -33,7 +33,7 @@ func TestConfigureWritesAndRemovesCatalogEnvironment(t *testing.T) {
 	}
 	envPath := filepath.Join(home, ".yapp", "yapp-env.sh")
 	env, err := os.ReadFile(envPath)
-	if err != nil || !strings.Contains(string(env), `export JAVA_HOME="${YAPP_HOME}/apps/jdk25/25"`) {
+	if err != nil || !strings.Contains(string(env), `export JAVA_HOME="${YAPP_HOME}/apps/jdk/25"`) {
 		t.Fatalf("JAVA_HOME missing from generated environment: %s (%v)", env, err)
 	}
 	if err := Configure(home, "bash", nil, []string{"bin"}, nil); err != nil {

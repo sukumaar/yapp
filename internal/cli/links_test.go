@@ -21,7 +21,7 @@ func TestExistingInstallLinksAndUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := c.Apps["jdk25"]
+	app := c.Apps["jdk@25"]
 	yapp := filepath.Join(home, ".yapp")
 	for _, binary := range app.LinkedBinaries() {
 		path := filepath.Join(yapp, app.InstallPath, binary)
@@ -34,12 +34,12 @@ func TestExistingInstallLinksAndUninstall(t *testing.T) {
 	}
 	a := app.Artifacts[0]
 	record := state.Install{Name: app.Name, Version: app.Version, Path: app.InstallPath, ArtifactURL: a.URL, SHA256: a.SHA256, OS: a.OS, Arch: a.Arch}
-	if err := state.Record(yapp, "jdk25", record); err != nil {
+	if err := state.Record(yapp, "jdk@25", record); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
 	for i := 0; i < 2; i++ {
-		if err := Execute(context.Background(), []string{"install", "jdk25"}, &output); err != nil {
+		if err := Execute(context.Background(), []string{"install", "jdk@25"}, &output); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -58,7 +58,7 @@ func TestExistingInstallLinksAndUninstall(t *testing.T) {
 	if !strings.Contains(string(env), "${YAPP_HOME}/bin") || strings.Contains(string(env), app.InstallPath+"/bin") || !strings.Contains(string(env), "JAVA_HOME") {
 		t.Fatalf("unexpected PATH configuration: %s", env)
 	}
-	if err := Execute(context.Background(), []string{"uninstall", "jdk25"}, &output); err != nil {
+	if err := Execute(context.Background(), []string{"uninstall", "jdk@25"}, &output); err != nil {
 		t.Fatal(err)
 	}
 	env, err = os.ReadFile(filepath.Join(yapp, "yapp-env.sh"))

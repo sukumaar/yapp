@@ -20,12 +20,12 @@ func TestWriteAppInfo(t *testing.T) {
 		Artifacts:   []catalog.Artifact{{OS: "linux", Arch: "amd64", Format: "tar.gz", URL: "https://example.test/node.tar.gz", SHA256: "abc123"}},
 	}
 	var output bytes.Buffer
-	err := writeAppInfo(&output, "node24", app, state.Install{Version: app.Version, Path: app.InstallPath}, true)
+	err := writeAppInfo(&output, "node@24", app, state.Install{Version: app.Version, Path: app.InstallPath}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"==> node24: Node.js 24.21.0",
+		"==> node@24: Node.js 24.21.0",
 		"Installed:    yes (24.21.0) — ~/.yapp/apps/node/24.21.0",
 		"Commands:     node, npm",
 		"linux/amd64 (tar.gz)",

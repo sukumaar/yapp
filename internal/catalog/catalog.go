@@ -23,9 +23,10 @@ var data []byte
 
 var sha256Pattern = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
-// Catalog contains installable apps keyed by their CLI identifier.
+// Catalog contains apps keyed by canonical CLI identifier and aliases to those IDs.
 type Catalog struct {
-	Apps map[string]App `yaml:"apps"`
+	Aliases map[string]string `yaml:"aliases"`
+	Apps    map[string]App    `yaml:"apps"`
 }
 
 // App describes one pinned version of an app.
@@ -56,7 +57,7 @@ func (a App) LinkedBinaries() []string {
 	return nil
 }
 
-// Dependency identifies a catalog app and the version expected by this app.
+// Dependency identifies a package family and the version expected by this app.
 type Dependency struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -178,7 +179,7 @@ func (c Catalog) Validate() error {
 		}
 		seenDependencies := make(map[string]struct{}, len(app.DependsOn))
 		for _, dependency := range app.DependsOn {
-			if !validIdentifier(dependency.Name) || dependency.Name == id || strings.TrimSpace(dependency.Version) == "" {
+			if !validIdentifier(dependency.Name) || strings.TrimSpace(dependency.Version) == "" {
 				return fmt.Errorf("app %q has an invalid dependency %q", id, dependency.Name)
 			}
 			if _, exists := seenDependencies[dependency.Name]; exists {
@@ -214,18 +215,21 @@ func (c Catalog) Validate() error {
 			}
 		}
 	}
+	for alias, id := range c.Aliases {
+		if !validIdentifier(alias) {
+			return fmt.Errorf("invalid app alias %q", alias)
+		}
+		if _, exists := c.Apps[alias]; exists {
+			return fmt.Errorf("app alias %q conflicts with a catalog identifier", alias)
+		}
+		if _, exists := c.Apps[id]; !exists {
+			return fmt.Errorf("app alias %q targets unknown catalog identifier %q", alias, id)
+		}
+	}
 	for id, app := range c.Apps {
 		for _, dependency := range app.DependsOn {
-			provider, ok := c.Apps[dependency.Name]
-			if !ok {
-				return fmt.Errorf("app %q depends on unknown app %q", id, dependency.Name)
-			}
-			matches, err := versionconstraint.Match(provider.MatchingVersion(), dependency.Version)
-			if err != nil {
+			if _, _, err := c.ResolveDependency(dependency); err != nil {
 				return fmt.Errorf("app %q dependency %q: %w", id, dependency.Name, err)
-			}
-			if !matches {
-				return fmt.Errorf("app %q depends on %s version %q, but the catalog provides %q", id, dependency.Name, dependency.Version, provider.Version)
 			}
 		}
 	}
@@ -233,6 +237,55 @@ func (c Catalog) Validate() error {
 		return err
 	}
 	return nil
+}
+
+// ResolveApp finds an app by its catalog identifier or configured alias.
+func (c Catalog) ResolveApp(id string) (string, App, bool) {
+	if app, ok := c.Apps[id]; ok {
+		return id, app, true
+	}
+	canonicalID, ok := c.Aliases[id]
+	if !ok {
+		return "", App{}, false
+	}
+	app, ok := c.Apps[canonicalID]
+	return canonicalID, app, ok
+}
+
+// ResolveDependency finds the versioned catalog app that provides a dependency
+// family and satisfies its version constraint.
+func (c Catalog) ResolveDependency(dependency Dependency) (string, App, error) {
+	ids := make([]string, 0, len(c.Apps))
+	for id := range c.Apps {
+		base := strings.SplitN(id, "@", 2)[0]
+		if id == dependency.Name || base == dependency.Name {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	var matches []string
+	for _, id := range ids {
+		app := c.Apps[id]
+		ok, err := versionconstraint.Match(app.MatchingVersion(), dependency.Version)
+		if err != nil {
+			return "", App{}, err
+		}
+		if ok {
+			matches = append(matches, id)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		if len(ids) == 0 {
+			return "", App{}, fmt.Errorf("unknown app %q", dependency.Name)
+		}
+		return "", App{}, fmt.Errorf("no catalog version of %q satisfies %q", dependency.Name, dependency.Version)
+	case 1:
+		id := matches[0]
+		return id, c.Apps[id], nil
+	default:
+		return "", App{}, fmt.Errorf("dependency %q version %q matches multiple catalog apps: %s", dependency.Name, dependency.Version, strings.Join(matches, ", "))
+	}
 }
 
 func (c Catalog) validateDependencyGraph() error {
@@ -248,7 +301,11 @@ func (c Catalog) validateDependencyGraph() error {
 		}
 		visiting[id] = true
 		for _, dependency := range c.Apps[id].DependsOn {
-			if err := visit(dependency.Name); err != nil {
+			providerID, _, err := c.ResolveDependency(dependency)
+			if err != nil {
+				return err
+			}
+			if err := visit(providerID); err != nil {
 				return err
 			}
 		}
@@ -296,8 +353,9 @@ func (c Catalog) DependencyOrder(appIDs []string) []string {
 		}
 		visited[id] = true
 		for _, dependency := range c.Apps[id].DependsOn {
-			if installed[dependency.Name] {
-				visit(dependency.Name)
+			providerID, _, err := c.ResolveDependency(dependency)
+			if err == nil && installed[providerID] {
+				visit(providerID)
 			}
 		}
 		ordered = append(ordered, id)
@@ -312,7 +370,15 @@ func validIdentifier(value string) bool {
 	if value == "" {
 		return false
 	}
-	for _, char := range value {
+	versionSeparator := false
+	for index, char := range value {
+		if char == '@' {
+			if index == 0 || index == len(value)-1 || versionSeparator {
+				return false
+			}
+			versionSeparator = true
+			continue
+		}
 		if !(char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-' || char == '_') {
 			return false
 		}

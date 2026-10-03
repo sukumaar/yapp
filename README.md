@@ -4,21 +4,26 @@ YAPP (Yet Another Package Provisioner) installs developer tools under `~/.yapp` 
 
 The project is in early development.
 
-| Tool | Version | Commands |
-| --- | --- | --- |
-| Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` |
-| Apache Maven | 3.9.16 | `mvn` |
-| Node.js | 24.21.0 (includes npm 11.19.0) | `node`, `npm`, `npx` |
+| App ID | Software | Version | Commands |
+| --- | --- | --- | --- |
+| `jdk@25` | Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` |
+| `maven@3` | Apache Maven | 3.9.16 | `mvn` |
+| `node@24` | Node.js | 24.21.0 (includes npm 11.19.0) | `node`, `npm`, `npx` |
+| `python-standalone@3` | Python (Astral standalone) | 3.14.8 | `python3`, `python3.14`, `pip3` |
+| `sbt@2` | sbt | 2.0.9 | `sbt` |
+| `go@1` | Go | 1.27.1 | `go`, `gofmt` |
+| `rust@1` | Rust | 1.98.0 | `rustc`, `cargo` |
+| `scala@3` | Scala | 3.9.0 LTS | `scala`, `scalac`, `scaladoc` |
 
 Setup supports Bash and Zsh in macOS and Linux.
 
 ## Why YAPP?
 
-Install Maven with `yapp install maven`; YAPP won't download Java or stop because Java is missing.
+Install Maven with `yapp install maven@3`; YAPP won't download Java or stop because Java is missing.
 
-Maven needs Java to run. If YAPP can't find or verify a compatible version, it suggests `yapp install jdk25`. You choose whether to run it.
+Maven needs Java to run. If YAPP can't find or verify a compatible version, it suggests `yapp install jdk@25`. You choose whether to run it.
 
-Available tools come from a shared catalog in this GitHub repository. More tools, including Scala, are planned.
+Available tools come from a shared catalog in this GitHub repository. Catalog stable releases only; never use alpha, beta, or release-candidate (RC) versions. Scala 3.9.0 is the current Scala LTS. Python, sbt, Go, and Rust do not use an upstream LTS designation, so YAPP pins their current stable releases. The Python catalog contains only the newest available Python version overall: if the available versions are 3.13.3, 3.12.10, and 3.14.8, include only 3.14.8. This uses Astral's standalone CPython builds.
 
 ## Install YAPP from source
 
@@ -45,15 +50,22 @@ The temporary Go download supports Linux and macOS on amd64 and arm64. The insta
 Use these commands:
 
 ```sh
-yapp install jdk25
-yapp install maven
-yapp install node24
-yapp info node24
+yapp install jdk@25
+yapp install maven@3
+yapp install node@24
+yapp install python-standalone@3
+yapp install sbt@2
+yapp install go@1
+yapp install rust@1
+yapp install scala@3
+yapp info node@24
 yapp version
 yapp help
 ```
 
-YAPP checks each download's checksum. The JDK provides `java`, `javac`, `javap`, `jar`, and `jshell` in `~/.yapp/bin`; Maven provides `mvn`; Node.js provides `node`, `npm`, and `npx`.
+YAPP checks each download's checksum. The JDK provides `java`, `javac`, `javap`, `jar`, and `jshell` in `~/.yapp/bin`; Maven provides `mvn`; Node.js provides `node`, `npm`, and `npx`; Python provides `python3`, `python3.14`, and `pip3`; Go provides `go` and `gofmt`; Rust provides `rustc` and `cargo`; Scala provides `scala`, `scalac`, and `scaladoc`.
+
+The catalog also defines the short aliases `go` → `go@1` and `rust` → `rust@1`. You can install those tools with `yapp install go` or `yapp install rust`; YAPP records each installation under its versioned catalog ID.
 
 Verified download archives stay in `~/.yapp/cache` and are reused on later installs. Before reuse, YAPP hashes the archive contents and compares the result with the catalog SHA-256. If it differs, YAPP deletes the bad archive and downloads it again. After each successful install, YAPP removes cached archives older than 30 days. It skips an archive that an active install is using.
 
@@ -71,7 +83,7 @@ For installations from an earlier YAPP build, rerun the install commands to add 
 To remove a tool:
 
 ```sh
-yapp uninstall maven
+yapp uninstall maven@3
 ```
 
 This removes Maven and its command links, then updates the shell setup. Other tools remain installed.

@@ -20,7 +20,7 @@ Makefile                  # Local build with linker-injected version metadata
 
 Keep application packages under `internal/` until there is a concrete, stable API that other Go modules need to import. Add focused packages as real responsibilities are implemented; avoid placeholder packages and unnecessary abstraction layers. The module path is `github.com/sukumaar/yapp`.
 
-The initial module targets Go 1.27. Release builds should embed version, commit, and build-time metadata using linker flags. The CLI currently implements help, version, and installation of the catalog's Linux amd64 JDK 25 artifact. Other package-management commands and platform artifacts remain unimplemented.
+The module targets Go 1.27. Release builds should embed version, commit, and build-time metadata using linker flags. The CLI implements help, version, install, uninstall, and info for the Linux amd64, Linux arm64, and Darwin arm64 catalog artifacts. Other package-management commands and platforms remain unimplemented.
 
 ## Goals
 
@@ -52,11 +52,23 @@ YAPP repository/
 └── cache/                 # Optional cached downloads
 ```
 
-The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. The JDK, Maven, and Node.js entries currently support Linux amd64 only. Node.js 24.21.0 bundles npm 11.19.0, so both tools install together.
+The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. Current entries support Linux amd64, Linux arm64, and Darwin arm64. Node.js 24.21.0 bundles npm 11.19.0, so both tools install together. Scala 3.9.0 is the current Scala LTS; Python, sbt, Go, and Rust do not designate an LTS release line.
+
+For Python, catalog exactly one release: the newest available version overall, across all minor lines. If Python 3.14.6, 3.14.7, and 3.14.8 are available, catalog only 3.14.8. If the choices are 3.13.3, 3.12.10, and 3.14.8, catalog only 3.14.8. Do not add older releases as parallel catalog entries.
+
+Catalog final stable releases only. Never select alpha, beta, or release-candidate (RC) builds.
 
 ## Shared app catalog
 
 The catalog lives in `internal/catalog/catalog.yaml` in this GitHub repository so contributors can add apps and maintain download links through pull requests. It is embedded into release binaries. YAML is used because catalog entries are reviewed and edited by people; the schema is strict and unknown fields are rejected.
+
+Aliases are declared in the root `aliases` map, separately from `apps`. Each alias points directly to a catalog ID and is accepted by install, info, and uninstall. For example:
+
+```yaml
+aliases:
+  go: go@1
+  rust: rust@1
+```
 
 ### Configuration must remain declarative
 
@@ -70,7 +82,7 @@ An illustrative entry:
 
 ```yaml
 apps:
-  jdk25:
+  jdk@25:
     name: Eclipse Temurin JDK 25
     version: 25.0.4.1+1
     semantic_version: "25.0.4"
@@ -82,7 +94,7 @@ apps:
         url: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz
         sha256: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
         strip_components: 1
-    install_path: apps/jdk25/25.0.4.1+1
+    install_path: apps/jdk/25.0.4.1+1
     executables:
       - bin/java
     environment:
@@ -92,21 +104,19 @@ apps:
         - bin
 ```
 
-Dependencies use catalog/CLI IDs and npm-style semantic version constraints:
+Dependencies name a package family and use npm-style semantic version constraints to select a versioned catalog entry:
 
 ```yaml
 depends_on:
-  - name: jdk25
-    version: ">=17 <26"
-  - name: maven
-    version: "^3.9.0"
+  - name: jdk
+    version: ">=17"
 ```
 
-Matching uses `github.com/Masterminds/semver/v3`. Supported forms include exact versions (`3.9.16`), comparisons (`>=17`, `<26`), caret (`^3.9.0`), tilde (`~3.9.0`), wildcards (`17.x`), hyphen ranges, space/comma-separated AND, and `||` OR. Partial versions such as `17` describe the 17.x range; a full three-part version pins a semantic version. Prereleases are excluded by default unless the constraint opts into them. SemVer build metadata does not affect matching. This is npm-style range support, not a guarantee of equivalence with every node-semver edge case or npm package-spec syntax (tags, Git URLs, etc.).
+Matching uses `github.com/Masterminds/semver/v3`. Supported forms include exact versions (`3.9.16`), comparisons (`>=17`, `<26`), caret (`^3.9.0`), tilde (`~3.9.0`), wildcards (`17.x`), hyphen ranges, space/comma-separated AND, and `||` OR. Partial versions such as `17` describe the 17.x range; a full three-part version pins a semantic version. Prereleases are excluded by default unless the constraint opts into them, but catalog entries must still use final stable releases only. SemVer build metadata does not affect matching. This is npm-style range support, not a guarantee of equivalence with every node-semver edge case or npm package-spec syntax (tags, Git URLs, etc.).
 
 Artifact `version` remains the exact upstream release identifier. An optional `semantic_version` explicitly supplies a full SemVer compatibility version for non-SemVer releases. For example, JDK release `25.0.4.1+1` declares `semantic_version: "25.0.4"`; its fourth component and build distinguish artifacts, not compatibility ranges. No implicit truncation occurs. Exact dependency pins use the semantic version, while the catalog version, URL, and checksum pin the full artifact.
 
-Catalog validation requires its offered provider version to satisfy each dependency range and rejects unknown dependencies and cycles. At installation time, matching uses the recorded semantic version (or a valid recorded SemVer release). An old registry can reuse a catalog mapping only when its release, artifact URL, and checksum still match. System executables found through PATH or environment variables have unverified versions; their presence is not treated as proof of compatibility. Requirements are checked per dependency edge, including transitive requirements.
+Catalog validation resolves each dependency family and requires exactly one matching provider version to satisfy its range; unknown providers, ambiguous matches, and cycles are rejected. For example, `name: jdk` with `version: "25.x"` selects catalog entry `jdk@25`. At installation time, matching uses the recorded semantic version (or a valid recorded SemVer release). An old registry can reuse a catalog mapping only when its release, artifact URL, and checksum still match. System executables found through PATH or environment variables have unverified versions; their presence is not treated as proof of compatibility. Requirements are checked per dependency edge, including transitive requirements.
 
 Dependency order is retained for legacy per-app PATH entries. Isolated apps share one bin directory, where command ownership replaces per-app PATH precedence. Missing, incompatible, or unverified installed dependencies produce advice only; YAPP never installs them automatically or blocks an app installation because they are absent. Catalog entries should use upstream artifact URLs and verified hashes.
 
@@ -147,10 +157,10 @@ Example shape (illustrative):
 {
   "schemaVersion": 1,
   "apps": {
-    "jdk25": {
+    "jdk@25": {
       "name": "Eclipse Temurin JDK 25",
       "version": "25.0.4.1+1",
-      "path": "apps/jdk25/25.0.4.1+1",
+      "path": "apps/jdk/25.0.4.1+1",
       "artifactUrl": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz",
       "sha256": "dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e",
       "os": "linux",

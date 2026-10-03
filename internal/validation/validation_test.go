@@ -4,7 +4,7 @@ import "testing"
 
 func TestConfigurationValues(t *testing.T) {
 	for value, want := range map[string]bool{
-		"apps/jdk25/25.0.4.1+1": true, "bin/java": true,
+		"apps/jdk/25.0.4.1+1": true, "bin/java": true,
 		"": false, ".": false, "../bin": false, "/bin": false,
 		"bin//java": false, "bin/./java": false, "bin/": false,
 		`bin\java`: false, "bin/$HOME": false, "bin/a b": false,

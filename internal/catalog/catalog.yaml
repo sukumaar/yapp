@@ -1,5 +1,9 @@
+aliases:
+  go: go@1
+  rust: rust@1
+
 apps:
-  node24:
+  node@24:
     name: Node.js
     version: 24.21.0
     semantic_version: "24.21.0"
@@ -11,6 +15,18 @@ apps:
         url: https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz
         sha256: 6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
         strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.gz
+        sha256: 724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz
+        sha256: bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057
+        strip_components: 1
     install_path: apps/node/24.21.0
     executables:
       - bin/node
@@ -20,7 +36,7 @@ apps:
         - bin/node
         - bin/npm
         - bin/npx
-  jdk25:
+  jdk@25:
     name: Eclipse Temurin JDK 25
     version: 25.0.4.1+1
     semantic_version: "25.0.4"
@@ -32,7 +48,19 @@ apps:
         url: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz
         sha256: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
         strip_components: 1
-    install_path: apps/jdk25/25.0.4.1+1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_aarch64_linux_hotspot_25.0.4.1_1.tar.gz
+        sha256: 69df11a02cfa3ef7d7ca645e03edce6778ec090e100f6ae2b42097865730ac52
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_aarch64_mac_hotspot_25.0.4.1_1.tar.gz
+        sha256: 61979887f7506a24a57439ff99adb8b3a7fc89977d9cfe3b8984f58a981b7b9d
+        strip_components: 1
+    install_path: apps/jdk/25.0.4.1+1
     executables:
       - bin/java
     install_mode:
@@ -46,13 +74,25 @@ apps:
     environment:
       variables:
         JAVA_HOME: .
-  maven:
+  maven@3:
     name: Apache Maven
     version: 3.9.16
     release_url: https://maven.apache.org/download.cgi
     artifacts:
       - os: linux
         arch: amd64
+        format: tar.gz
+        url: https://downloads.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
+        sha256: 80ffca22aed9e8b9713a232f3394fd81d7f20322df75efdb2b047dbd3e3a23bb
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://downloads.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
+        sha256: 80ffca22aed9e8b9713a232f3394fd81d7f20322df75efdb2b047dbd3e3a23bb
+        strip_components: 1
+      - os: darwin
+        arch: arm64
         format: tar.gz
         url: https://downloads.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
         sha256: 80ffca22aed9e8b9713a232f3394fd81d7f20322df75efdb2b047dbd3e3a23bb
@@ -65,5 +105,172 @@ apps:
       binaries:
         - bin/mvn
     depends_on:
-      - name: jdk25
+      - name: jdk
         version: "25.x"
+  python-standalone@3:
+    name: Python (Astral standalone)
+    version: 3.14.8
+    semantic_version: "3.14.8"
+    release_url: https://github.com/astral-sh/python-build-standalone/releases/tag/20261003
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.14.8+20261003-x86_64-unknown-linux-gnu-install_only.tar.gz
+        sha256: 371b6c281bbb09b29279e9e3a2996bab4ae2ea03cca52bf869f8bd89286b0ae8
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.14.8%2B20261003-aarch64-unknown-linux-gnu-install_only.tar.gz
+        sha256: abc0c8dd54a144909a5e4905737bc33f244cb17ce8afc4a7b0791ee1e006ae23
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/astral-sh/python-build-standalone/releases/download/20261003/cpython-3.14.8%2B20261003-aarch64-apple-darwin-install_only.tar.gz
+        sha256: d15291f940cfecd2e54010d5e37d2e03aa192f076a65d26ab741372fff2dabfe
+        strip_components: 1
+    install_path: apps/python-standalone/3.14.8
+    executables:
+      - bin/python3.14
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/python3
+        - bin/python3.14
+        - bin/pip3
+  sbt@2:
+    name: sbt
+    version: 2.0.9
+    semantic_version: "2.0.9"
+    release_url: https://github.com/sbt/sbt/releases/tag/v2.0.9
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://github.com/sbt/sbt/releases/download/v2.0.9/sbt-2.0.9.tgz
+        sha256: 351087fb5ad0d8b271f21b4c6f8e4912c8f6dbf81e1d06fe215bb165f14668b3
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/sbt/sbt/releases/download/v2.0.9/sbt-2.0.9.tgz
+        sha256: 351087fb5ad0d8b271f21b4c6f8e4912c8f6dbf81e1d06fe215bb165f14668b3
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/sbt/sbt/releases/download/v2.0.9/sbt-2.0.9.tgz
+        sha256: 351087fb5ad0d8b271f21b4c6f8e4912c8f6dbf81e1d06fe215bb165f14668b3
+        strip_components: 1
+    install_path: apps/sbt/2.0.9
+    executables:
+      - bin/sbt
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/sbt
+    depends_on:
+      - name: jdk
+        version: ">=17"
+  go@1:
+    name: Go
+    version: 1.27.1
+    semantic_version: "1.27.1"
+    release_url: https://go.dev/doc/devel/release#go1.27.1
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://go.dev/dl/go1.27.1.linux-amd64.tar.gz
+        sha256: 63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://go.dev/dl/go1.27.1.linux-arm64.tar.gz
+        sha256: 3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://go.dev/dl/go1.27.1.darwin-arm64.tar.gz
+        sha256: ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12
+        strip_components: 1
+    install_path: apps/go/1.27.1
+    executables:
+      - bin/go
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/go
+        - bin/gofmt
+  rust@1:
+    name: Rust
+    version: 1.98.0
+    semantic_version: "1.98.0"
+    release_url: https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://static.rust-lang.org/dist/2026-08-20/rust-1.98.0-x86_64-unknown-linux-gnu.tar.gz
+        sha256: aa30409afa67bd1ada244cefd82c7980e6a65bc113bb978e934b2413c75e3900
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://static.rust-lang.org/dist/2026-08-20/rust-1.98.0-aarch64-unknown-linux-gnu.tar.gz
+        sha256: 5fbb4282403046d52a4672765c6761a809bf9f33e699b17e6eb7a93ab7770cc3
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://static.rust-lang.org/dist/2026-08-20/rust-1.98.0-aarch64-apple-darwin.tar.gz
+        sha256: 026ec75bec81fb8c10b11df98f1336ee39f4bc11e04d6745dffe9fca81e5c0b5
+        strip_components: 1
+    install_path: apps/rust/1.98.0
+    executables:
+      - rustc/bin/rustc
+    install_mode:
+      symlink: true
+      binaries:
+        - rustc/bin/rustc
+        - cargo/bin/cargo
+  scala@3:
+    name: Scala
+    version: 3.9.0
+    semantic_version: "3.9.0"
+    release_url: https://github.com/scala/scala3/releases/tag/3.9.0
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://github.com/scala/scala3/releases/download/3.9.0/scala3-3.9.0.tar.gz
+        sha256: 8ecddee33ecda620256e4b744b928d3ad6de64653bd41e4b6a308992b3b6bb31
+        strip_components: 1
+      - os: linux
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/scala/scala3/releases/download/3.9.0/scala3-3.9.0.tar.gz
+        sha256: 8ecddee33ecda620256e4b744b928d3ad6de64653bd41e4b6a308992b3b6bb31
+        strip_components: 1
+      - os: darwin
+        arch: arm64
+        format: tar.gz
+        url: https://github.com/scala/scala3/releases/download/3.9.0/scala3-3.9.0.tar.gz
+        sha256: 8ecddee33ecda620256e4b744b928d3ad6de64653bd41e4b6a308992b3b6bb31
+        strip_components: 1
+    install_path: apps/scala/3.9.0
+    executables:
+      - bin/scala
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/scala
+        - bin/scalac
+        - bin/scaladoc
+    depends_on:
+      - name: jdk
+        version: ">=17"
