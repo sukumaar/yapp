@@ -2,7 +2,15 @@
 
 YAPP (Yet Another Package Provisioner) installs developer tools under `~/.yapp` and adds their commands to your shell.
 
-The project is in early development. On Linux amd64, you can install Eclipse Temurin JDK 25, Apache Maven 3.9.16, and Node.js 24.21.0 with bundled npm 11.19.0. Shell setup supports Bash and Zsh.
+The project is in early development.
+
+| Tool | Version | Commands | Platform |
+| --- | --- | --- | --- |
+| Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` | Linux amd64 |
+| Apache Maven | 3.9.16 | `mvn` | Linux amd64 |
+| Node.js | 24.21.0 (includes npm 11.19.0) | `node`, `npm`, `npx` | Linux amd64 |
+
+Shell setup supports Bash and Zsh.
 
 ## Why YAPP?
 
@@ -22,7 +30,15 @@ bash scripts/install.sh
 bash scripts/install.sh --help
 ```
 
-The script shows colored build stages, streams Go build output, and displays curl's download bar. It builds YAPP under `~/.yapp/lib/yapp` and links the command as `~/.yapp/bin/yapp`. It uses Go from `PATH` when a compatible version is available. Otherwise, it asks before downloading a checksum-verified Go 1.27.1 toolchain temporarily for the build; the pinned release and checksums are from the [official Go downloads](https://go.dev/dl/). It asks before replacing an existing YAPP binary or command link, leaves other files in `~/.yapp` untouched, creates `~/.yapp/yapp-env.sh`, and adds one source line to Bash or Zsh startup files. YAPP refreshes the environment file after app installs and removals, including `JAVA_HOME`. The temporary Go download supports Linux and macOS on amd64 and arm64; `bash`, `curl`, `tar`, and `sha256sum` or `shasum` are required.
+The installer:
+
+- Builds YAPP at `~/.yapp/lib/yapp` and links the command from `~/.yapp/bin/yapp`.
+- Uses a compatible Go compiler from `PATH`, or asks before downloading the checksum-verified Go 1.27.1 toolchain from the [official Go downloads](https://go.dev/dl/).
+- Asks before replacing an existing YAPP binary or command link and leaves other files in `~/.yapp` untouched.
+- Creates `~/.yapp/yapp-env.sh` and adds one source line to the shell startup file: `.bashrc` on Linux or `.bash_profile` on macOS for Bash; `.zshrc` on Linux or `.zprofile` on macOS for Zsh.
+- Shows colored build stages, Go build output, and curl's download progress.
+
+The temporary Go download supports Linux and macOS on amd64 and arm64. The installer requires `bash`, `curl`, `tar`, and `sha256sum` or `shasum`.
 
 ## Using YAPP
 
@@ -41,12 +57,11 @@ YAPP checks each download's checksum. The JDK provides `java`, `javac`, `javap`,
 
 Verified download archives stay in `~/.yapp/cache` and are reused on later installs. Before reuse, YAPP hashes the archive contents and compares the result with the catalog SHA-256. If it differs, YAPP deletes the bad archive and downloads it again. After each successful install, YAPP removes cached archives older than 30 days. It skips an archive that an active install is using.
 
-After installing, open a new terminal or reload your shell setup:
+After installing, open a new terminal or load YAPP's environment into the current shell:
 
 ```sh
-source ~/.bashrc  # Bash
-# or
-source ~/.zshrc   # Zsh
+. "${HOME}/.yapp/yapp-env.sh"
+yapp
 ```
 
 Once `~/.yapp/bin` is on your PATH, new commands are available right away. Reload your shell after environment changes such as `JAVA_HOME`.
