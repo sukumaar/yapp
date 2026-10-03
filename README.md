@@ -1,6 +1,6 @@
-# YAPP
+# YAPP — a focused developer toolchain manager
 
-YAPP (Yet Another Package Provisioner) installs developer tools under `~/.yapp` and adds their commands to your shell.
+YAPP installs the language runtimes, SDKs, and build tools developers use to build software. Its curated catalog focuses on development toolchains instead of trying to cover every command-line utility. YAPP installs pinned releases under `~/.yapp`, verifies downloads, and makes selected commands available in your shell.
 
 The project is in early development.
 
@@ -17,13 +17,13 @@ The project is in early development.
 
 Setup supports Bash and Zsh in macOS and Linux.
 
-## Why YAPP?
+## A focused toolchain catalog
 
-Install Maven with `yapp install maven@3`; YAPP won't download Java or stop because Java is missing.
+YAPP is for the tools you use to write, run, compile, test, and package software: language runtimes, SDKs, and build tools. The catalog stays focused on that job. Each entry pins a release and records its upstream archive, checksum, install location, commands, and runtime requirements.
 
-Maven needs Java to run. If YAPP can't find or verify a compatible version, it suggests `yapp install jdk@25`. You choose whether to run it.
+Installations live under `~/.yapp`, and selected commands are linked into `~/.yapp/bin`. Installing Maven, for example, does not silently install Java; if no compatible JDK is available, YAPP suggests `yapp install jdk@25` and leaves the choice to you.
 
-Available tools come from a shared catalog in this GitHub repository. Catalog stable releases only; never use alpha, beta, or release-candidate (RC) versions. Scala 3.9.0 is the current Scala LTS. Python, sbt, Go, and Rust do not use an upstream LTS designation, so YAPP pins their current stable releases. The Python catalog contains only the newest available Python version overall: if the available versions are 3.13.3, 3.12.10, and 3.14.8, include only 3.14.8. This uses Astral's standalone CPython builds.
+Catalog entries use final stable releases only; YAPP does not pin alpha, beta, or release-candidate versions. Scala 3.9.0 is the current Scala LTS. Python, sbt, Go, and Rust do not use an upstream LTS designation, so YAPP pins their current stable releases. The Python catalog contains only the newest available Python version overall: if the choices are 3.13.3, 3.12.10, and 3.14.8, it includes only 3.14.8. Python is provided by Astral's standalone CPython builds.
 
 ## Install YAPP from source
 
