@@ -1,4 +1,4 @@
-# YAPP — a focused developer toolchain manager
+# YAPP: a focused developer toolchain manager
 
 YAPP installs the language runtimes, SDKs, and build tools developers use to build software. Its curated catalog focuses on development toolchains instead of trying to cover every command-line utility. YAPP installs pinned releases under `~/.yapp`, verifies downloads, and makes selected commands available in your shell.
 
