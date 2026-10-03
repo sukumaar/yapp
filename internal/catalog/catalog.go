@@ -3,21 +3,23 @@ package catalog
 
 import (
 	"bytes"
-	"embed"
+	_ "embed"
 	"fmt"
 	"io"
 	"net/url"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/sukumaar/yapp/internal/validation"
 	"github.com/sukumaar/yapp/internal/versionconstraint"
 
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed catalog.yaml
-var files embed.FS
+var data []byte
 
 var sha256Pattern = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
@@ -37,6 +39,21 @@ type App struct {
 	Executables     []string          `yaml:"executables"`
 	Environment     EnvironmentConfig `yaml:"environment"`
 	DependsOn       []Dependency      `yaml:"depends_on"`
+	InstallMode     *InstallMode      `yaml:"install_mode"`
+}
+
+// InstallMode selects the commands exposed through the shared YAPP bin.
+// When present, per-app environment.paths are not added to PATH.
+type InstallMode struct {
+	Symlink  bool     `yaml:"symlink"`
+	Binaries []string `yaml:"binaries"`
+}
+
+func (a App) LinkedBinaries() []string {
+	if a.InstallMode != nil && a.InstallMode.Symlink {
+		return a.InstallMode.Binaries
+	}
+	return nil
 }
 
 // Dependency identifies a catalog app and the version expected by this app.
@@ -74,10 +91,6 @@ type Artifact struct {
 
 // Default loads the catalog distributed with the YAPP binary.
 func Default() (Catalog, error) {
-	data, err := files.ReadFile("catalog.yaml")
-	if err != nil {
-		return Catalog{}, fmt.Errorf("read embedded catalog: %w", err)
-	}
 	return Parse(data)
 }
 
@@ -129,6 +142,22 @@ func (c Catalog) Validate() error {
 		if !validRelativePath(app.InstallPath) {
 			return fmt.Errorf("app %q has an unsafe install_path", id)
 		}
+		if a := app.InstallMode; a != nil {
+			if a.Symlink && len(a.Binaries) == 0 {
+				return fmt.Errorf("app %q enables symlinks without binaries", id)
+			}
+			seen := make(map[string]bool)
+			for _, binary := range a.Binaries {
+				if !validRelativePath(binary) {
+					return fmt.Errorf("app %q has unsafe install_mode binary %q", id, binary)
+				}
+				name := path.Base(binary)
+				if seen[name] {
+					return fmt.Errorf("app %q exposes duplicate command %q", id, name)
+				}
+				seen[name] = true
+			}
+		}
 		if len(app.Executables) == 0 {
 			return fmt.Errorf("app %q must specify at least one executable to verify", id)
 		}
@@ -138,7 +167,7 @@ func (c Catalog) Validate() error {
 			}
 		}
 		for name, value := range app.Environment.Variables {
-			if !validEnvironmentName(name) || value != "." && !validRelativePath(value) {
+			if !validation.EnvironmentName(name) || value != "." && !validRelativePath(value) {
 				return fmt.Errorf("app %q has an invalid environment variable setting", id)
 			}
 		}
@@ -285,18 +314,6 @@ func validIdentifier(value string) bool {
 	}
 	for _, char := range value {
 		if !(char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-' || char == '_') {
-			return false
-		}
-	}
-	return true
-}
-
-func validEnvironmentName(value string) bool {
-	if value == "" {
-		return false
-	}
-	for index, char := range value {
-		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char == '_' || index > 0 && char >= '0' && char <= '9') {
 			return false
 		}
 	}

@@ -10,9 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 
 	"github.com/sukumaar/yapp/internal/buildinfo"
 	"github.com/sukumaar/yapp/internal/catalog"
+	"github.com/sukumaar/yapp/internal/commandlinks"
 	"github.com/sukumaar/yapp/internal/installer"
 	"github.com/sukumaar/yapp/internal/shellenv"
 	"github.com/sukumaar/yapp/internal/state"
@@ -120,10 +122,27 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 				return fmt.Errorf("installation state exists, but %s is missing or invalid at %s", app.Name, executablePath)
 			}
 		}
+		if err := commandlinks.Link(yappHome, installed.Path, app.LinkedBinaries()); err != nil {
+			return fmt.Errorf("%s is installed, but command linking failed: %w", app.Name, err)
+		}
+		var obsolete []string
+		for _, old := range installed.LinkedBinaries {
+			if !slices.Contains(app.LinkedBinaries(), old) {
+				obsolete = append(obsolete, old)
+			}
+		}
+		if err := commandlinks.Remove(yappHome, installed.Path, obsolete); err != nil {
+			return err
+		}
+		installed.LinkedBinaries = app.LinkedBinaries()
+		if err := state.Record(yappHome, args[0], installed); err != nil {
+			return err
+		}
+		current.Apps[args[0]] = installed
 		if err := configureShell(userHome, shell, catalogData, current); err != nil {
 			return fmt.Errorf("%s is installed, but shell configuration failed: %w", app.Name, err)
 		}
-		_, err = fmt.Fprintf(stdout, "%s %s is already installed; shell PATH configuration is ready. Restart your shell or source your rc file.\n", app.Name, app.Version)
+		_, err = fmt.Fprintf(stdout, "%s %s is already installed; command links and shell configuration are ready. Reload ~/.%src for initial setup or changed environment variables.\n", app.Name, app.Version, shell)
 		if err != nil {
 			return err
 		}
@@ -138,10 +157,13 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("installed %s at %s, but could not record local state: %w", app.Name, installPath, err)
 	}
 	current.Apps[args[0]] = installRecord
+	if err := commandlinks.Link(yappHome, installRecord.Path, installRecord.LinkedBinaries); err != nil {
+		return fmt.Errorf("installed %s, but command linking failed: %w", app.Name, err)
+	}
 	if err := configureShell(userHome, shell, catalogData, current); err != nil {
 		return fmt.Errorf("installed %s, but could not configure shell PATH: %w", app.Name, err)
 	}
-	_, err = fmt.Fprintf(stdout, "Installed %s %s at %s. Updated shell environment and PATH setup in ~/.%src; restart your shell or source that file.\n", app.Name, app.Version, installPath, shell)
+	_, err = fmt.Fprintf(stdout, "Installed %s %s at %s. Shell setup: ~/.%src. Reload it for initial setup or changed environment variables; shared-bin commands are available immediately once ~/.yapp/bin is on PATH.\n", app.Name, app.Version, installPath, shell)
 	if err != nil {
 		return err
 	}
@@ -172,6 +194,9 @@ func uninstallApp(args []string, stdout io.Writer) error {
 	catalogData, err := catalog.Default()
 	if err != nil {
 		return err
+	}
+	if err := commandlinks.Remove(yappHome, record.Path, record.LinkedBinaries); err != nil {
+		return fmt.Errorf("could not remove %s command links: %w", record.Name, err)
 	}
 	if err := installer.Uninstall(yappHome, args[0], record); err != nil {
 		return err
@@ -284,7 +309,7 @@ func configureShell(userHome, shell string, catalogData catalog.Catalog, install
 	}
 	ids = catalogData.DependencyOrder(ids)
 	environment := make(map[string]string)
-	var pathEntries []string
+	pathEntries := []string{"bin"}
 	for _, id := range ids {
 		app := catalogData.Apps[id]
 		installPath := installed.Apps[id].Path
@@ -299,8 +324,10 @@ func configureShell(userHome, shell string, catalogData catalog.Catalog, install
 			}
 			environment[name] = value
 		}
-		for _, path := range app.Environment.Paths {
-			pathEntries = append(pathEntries, filepath.ToSlash(filepath.Join(filepath.FromSlash(installPath), filepath.FromSlash(path))))
+		if app.InstallMode == nil {
+			for _, path := range app.Environment.Paths {
+				pathEntries = append(pathEntries, filepath.ToSlash(filepath.Join(filepath.FromSlash(installPath), filepath.FromSlash(path))))
+			}
 		}
 	}
 	return shellenv.Configure(userHome, shell, environment, pathEntries)

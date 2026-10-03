@@ -19,6 +19,7 @@ import (
 
 	"github.com/sukumaar/yapp/internal/catalog"
 	"github.com/sukumaar/yapp/internal/state"
+	"github.com/sukumaar/yapp/internal/validation"
 )
 
 const (
@@ -33,7 +34,7 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 	if err := ensureRealDir(home, 0o700); err != nil {
 		return state.Install{}, "", err
 	}
-	if !safeRelativePath(app.InstallPath) {
+	if !validation.SafeRelativePath(app.InstallPath) {
 		return state.Install{}, "", fmt.Errorf("unsafe install path in catalog")
 	}
 	installPath := filepath.Join(home, filepath.FromSlash(app.InstallPath))
@@ -77,6 +78,11 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 			return state.Install{}, "", err
 		}
 	}
+	for _, executable := range app.LinkedBinaries() {
+		if err := verifyExecutable(filepath.Join(stage, filepath.FromSlash(executable)), executable); err != nil {
+			return state.Install{}, "", err
+		}
+	}
 	if err := os.Rename(stage, installPath); err != nil {
 		return state.Install{}, "", fmt.Errorf("publish installation: %w", err)
 	}
@@ -95,6 +101,7 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 		OS:              artifact.OS,
 		Arch:            artifact.Arch,
 		InstalledAt:     time.Now().UTC(),
+		LinkedBinaries:  app.LinkedBinaries(),
 	}
 	return record, installPath, nil
 }
@@ -104,7 +111,7 @@ func Uninstall(home, appID string, install state.Install) error {
 	if err := ensureExistingRealDir(home); err != nil {
 		return err
 	}
-	if !safeRelativePath(appID) || !safeRelativePath(install.Path) || !strings.HasPrefix(filepath.ToSlash(install.Path), "apps/"+filepath.ToSlash(appID)+"/") {
+	if !validation.SafeRelativePath(appID) || !validation.SafeRelativePath(install.Path) || !strings.HasPrefix(filepath.ToSlash(install.Path), "apps/"+filepath.ToSlash(appID)+"/") {
 		return fmt.Errorf("refusing to uninstall unsafe recorded path %q", install.Path)
 	}
 	components := strings.Split(filepath.ToSlash(install.Path), "/")
@@ -417,23 +424,6 @@ func ensurePathDirs(root, relative string) error {
 		}
 	}
 	return nil
-}
-
-func safeRelativePath(value string) bool {
-	if value == "" || filepath.IsAbs(value) || strings.Contains(value, `\`) {
-		return false
-	}
-	for _, component := range strings.Split(filepath.ToSlash(value), "/") {
-		if component == "" || component == "." || component == ".." {
-			return false
-		}
-		for _, char := range component {
-			if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || strings.ContainsRune("._+-", char)) {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func verifyExecutable(path, name string) error {

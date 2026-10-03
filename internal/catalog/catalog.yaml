@@ -14,11 +14,17 @@ apps:
     install_path: apps/jdk25/25.0.4.1+1
     executables:
       - bin/java
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/java
+        - bin/javac
+        - bin/javap
+        - bin/jar
+        - bin/jshell
     environment:
       variables:
         JAVA_HOME: .
-      paths:
-        - bin
   maven:
     name: Apache Maven
     version: 3.9.16
@@ -33,9 +39,10 @@ apps:
     install_path: apps/maven/3.9.16
     executables:
       - bin/mvn
-    environment:
-      paths:
-        - bin
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/mvn
     depends_on:
       - name: jdk25
         version: "25.x"

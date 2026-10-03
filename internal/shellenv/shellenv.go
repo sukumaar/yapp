@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/sukumaar/yapp/internal/fileutil"
+	"github.com/sukumaar/yapp/internal/validation"
 )
 
 const (
@@ -36,12 +39,12 @@ func Configure(userHome, shell string, variables map[string]string, pathEntries 
 		return fmt.Errorf("unsupported shell %q", shell)
 	}
 	for name, value := range variables {
-		if !validVariableName(name) || !safeRelativePath(value) {
+		if !validation.EnvironmentName(name) || !validation.SafeRelativePath(value) {
 			return fmt.Errorf("unsafe YAPP environment variable setting %q", name)
 		}
 	}
 	for _, path := range pathEntries {
-		if !safeRelativePath(path) {
+		if !validation.SafeRelativePath(path) {
 			return fmt.Errorf("unsafe YAPP PATH entry %q", path)
 		}
 	}
@@ -73,7 +76,7 @@ export YAPP_HOME="${HOME}/.yapp"
 		bin := "${YAPP_HOME}/" + filepath.ToSlash(pathEntries[index])
 		fmt.Fprintf(&env, "case \":${PATH:-}:\" in\n  *\":%s:\"*) ;;\n  *) export PATH=\"%s${PATH:+:${PATH}}\" ;;\nesac\n", bin, bin)
 	}
-	if err := atomicWrite(envPath, []byte(env.String()), 0o600); err != nil {
+	if err := fileutil.AtomicWrite(envPath, []byte(env.String()), 0o600); err != nil {
 		return fmt.Errorf("write YAPP shell environment: %w", err)
 	}
 
@@ -122,66 +125,4 @@ export YAPP_HOME="${HOME}/.yapp"
 		return fmt.Errorf("sync %s: %w", rcName, err)
 	}
 	return nil
-}
-
-func validVariableName(value string) bool {
-	if value == "" {
-		return false
-	}
-	for index, char := range value {
-		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char == '_' || index > 0 && char >= '0' && char <= '9') {
-			return false
-		}
-	}
-	return true
-}
-
-func atomicWrite(path string, data []byte, mode os.FileMode) error {
-	file, err := os.CreateTemp(filepath.Dir(path), ".yapp-env-*")
-	if err != nil {
-		return err
-	}
-	tempPath := file.Name()
-	defer os.Remove(tempPath)
-	if err := file.Chmod(mode); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if _, err := file.Write(data); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tempPath, path); err != nil {
-		return err
-	}
-	directory, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
-}
-
-func safeRelativePath(value string) bool {
-	if value == "" || filepath.IsAbs(value) || strings.Contains(value, `\`) {
-		return false
-	}
-	for _, component := range strings.Split(filepath.ToSlash(value), "/") {
-		if component == "" || component == "." || component == ".." {
-			return false
-		}
-		for _, char := range component {
-			if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || strings.ContainsRune("._+-", char)) {
-				return false
-			}
-		}
-	}
-	return true
 }

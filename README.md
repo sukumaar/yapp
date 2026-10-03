@@ -1,31 +1,53 @@
 # YAPP
 
-**Yet Another Package Provisioner** is a package manager in development for the tools developers use every day. YAPP aims to make it simple to install and update tools such as Java, Scala, and Maven, while keeping them together under `~/.yapp`.
+YAPP (Yet Another Package Provisioner) installs developer tools under `~/.yapp` and adds their commands to your shell.
+
+The project is in early development. You can currently install and uninstall Eclipse Temurin JDK 25 and Apache Maven 3.9.16 on Linux amd64, with shell setup for Bash and Zsh.
 
 ## Why YAPP?
 
-Installing a developer tool can pull in software you did not ask for, or leave you juggling versions across different projects. YAPP is being built to give you one place to manage your tools and their versions, and to make installed commands available on your `PATH`.
+Install Maven with `yapp install maven`; YAPP won't download Java or stop because Java is missing.
 
-YAPP will install each requested app on its own. For example, `yapp install maven` will not install Java or fail because Java is missing. Maven may still need Java when you run it; YAPP leaves that runtime choice and setup to you.
+Maven needs Java to run. If YAPP can't find or verify a compatible version, it suggests `yapp install jdk25`. You choose whether to run it.
 
-Tool downloads will come from a shared catalog hosted on GitHub. That catalog can grow as developers add tools and keep download versions current.
+Available tools come from a shared catalog in this GitHub repository. More tools, including Scala, are planned.
 
 ## Using YAPP
 
-YAPP's commands will be familiar if you have used Homebrew:
+Use these commands:
 
 ```sh
 yapp install jdk25
 yapp install maven
-yapp uninstall maven
 yapp version
+yapp help
 ```
 
-Available install targets are Eclipse Temurin JDK 25 and Apache Maven 3.9.16 for Linux amd64. Installing either creates `~/.yapp`, verifies the download, and configures environment variables and `PATH` through your Bash or Zsh startup file. When both are installed, Java is placed before Maven on `PATH`. Open a new shell or source your startup file after installation. YAPP never installs dependencies automatically. Installing Maven does not require Java to already be installed; if Java is not detected, YAPP suggests the `yapp install jdk25` command.
+YAPP checks each download's checksum. The JDK provides `java`, `javac`, `javap`, `jar`, and `jshell` in `~/.yapp/bin`; Maven provides `mvn`.
 
-Use `yapp uninstall <app>` to remove an app installed by YAPP and refresh its shell configuration.
+After installing, open a new terminal or reload your shell setup:
 
-Other commands are planned:
+```sh
+source ~/.bashrc  # Bash
+# or
+source ~/.zshrc   # Zsh
+```
+
+Once `~/.yapp/bin` is on your PATH, new commands are available right away. Reload your shell after environment changes such as `JAVA_HOME`.
+
+For installations from an earlier YAPP build, rerun the install commands to add command links without downloading the tools again. Open a new terminal to load the updated PATH.
+
+To remove a tool:
+
+```sh
+yapp uninstall maven
+```
+
+This removes Maven and its command links, then updates the shell setup. Other tools remain installed.
+
+If a command name is already taken in `~/.yapp/bin`, YAPP reports the conflict and preserves the existing file or link. The app remains installed. Resolve the conflict, then rerun its install command to create the links.
+
+## Planned commands
 
 | Command | What it does |
 | --- | --- |
@@ -38,11 +60,7 @@ Other commands are planned:
 | `yapp doctor` | Check for common setup problems. |
 | `yapp cleanup` | Remove cached downloads that are no longer needed. |
 
-Commands and behavior are still being designed and may change.
-
-## Installation
-
-YAPP is in early development. Temurin JDK 25 installation is implemented for Linux amd64; other app-management commands and platform artifacts are still in progress.
+Commands and behavior may change during development.
 
 ## License
 
