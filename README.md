@@ -4,6 +4,32 @@ YAPP installs the language runtimes, SDKs, and build tools developers use to bui
 
 The project is in early development.
 
+Setup supports Bash and Zsh in macOS and Linux.
+
+## Give your AI coding agent the tools to build
+
+Keep your development setup small and explicit. YAPP gives developers, automation scripts, and AI coding agents a single CLI for installing supported runtimes, SDKs, and build tools.
+
+- **Your toolchain, in your home.** Tools and cached downloads live under `~/.yapp`, with no sudo required for installation.
+- **Versions fixed by the catalog.** Each YAPP build bundles exact releases and SHA-256 checksums, so fresh installs use that build's chosen versions.
+- **Prebuilt tool distributions.** YAPP extracts verified release archives without compiling the tools or running package installation hooks.
+- **You choose the dependencies.** YAPP reports runtime requirements and leaves additional installations to you or your agent.
+
+With YAPP installed and on PATH, an agent with shell access can inspect and install a tool:
+
+```sh
+yapp info go
+yapp install go
+. "$HOME/.yapp/yapp-env.sh"
+go version
+```
+
+Load the generated environment in the shell that runs your build. Available tools and versions are limited to YAPP's bundled catalog.
+
+## A focused toolchain catalog
+
+YAPP is for the tools you use to write, run, compile, test, and package software: language runtimes, SDKs, and build tools. The catalog stays focused on that job. Each entry pins a release and records its upstream archive, checksum, install location, commands, and runtime requirements.
+
 | App ID | Software | Version | Commands |
 | --- | --- | --- | --- |
 | `jdk@25` | Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` |
@@ -14,12 +40,6 @@ The project is in early development.
 | `go@1` | Go | 1.27.1 | `go`, `gofmt` |
 | `rust@1` | Rust | 1.98.0 | `rustc`, `cargo` |
 | `scala@3` | Scala | 3.9.0 LTS | `scala`, `scalac`, `scaladoc` |
-
-Setup supports Bash and Zsh in macOS and Linux.
-
-## A focused toolchain catalog
-
-YAPP is for the tools you use to write, run, compile, test, and package software: language runtimes, SDKs, and build tools. The catalog stays focused on that job. Each entry pins a release and records its upstream archive, checksum, install location, commands, and runtime requirements.
 
 Installations live under `~/.yapp`, and selected commands are linked into `~/.yapp/bin`. Installing Maven, for example, does not silently install Java; if no compatible JDK is available, YAPP suggests `yapp install jdk@25` and leaves the choice to you.
 
