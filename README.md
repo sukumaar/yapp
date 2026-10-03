@@ -4,13 +4,13 @@ YAPP (Yet Another Package Provisioner) installs developer tools under `~/.yapp` 
 
 The project is in early development.
 
-| Tool | Version | Commands | Platform |
-| --- | --- | --- | --- |
-| Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` | Linux amd64 |
-| Apache Maven | 3.9.16 | `mvn` | Linux amd64 |
-| Node.js | 24.21.0 (includes npm 11.19.0) | `node`, `npm`, `npx` | Linux amd64 |
+| Tool | Version | Commands |
+| --- | --- | --- |
+| Eclipse Temurin JDK | 25 | `java`, `javac`, `javap`, `jar`, `jshell` |
+| Apache Maven | 3.9.16 | `mvn` |
+| Node.js | 24.21.0 (includes npm 11.19.0) | `node`, `npm`, `npx` |
 
-Shell setup supports Bash and Zsh.
+Setup supports Bash and Zsh in macOS and Linux.
 
 ## Why YAPP?
 
