@@ -10,9 +10,10 @@ Setup supports Bash and Zsh in macOS and Linux.
 
 Keep your development setup small and explicit. YAPP gives developers, automation scripts, and AI coding agents a single CLI for installing supported runtimes, SDKs, and build tools.
 
+- **Compiled Go CLI.** YAPP runs as a single binary. New shells source the generated environment file without launching YAPP.
 - **Your toolchain, in your home.** Tools and cached downloads live under `~/.yapp`, with no sudo required for installation.
 - **Versions fixed by the catalog.** Each YAPP build bundles exact releases and SHA-256 checksums, so fresh installs use that build's chosen versions.
-- **Prebuilt tool distributions.** YAPP extracts verified release archives without compiling the tools or running package installation hooks.
+- **Prebuilt tools and reusable downloads.** YAPP extracts verified release archives without compiling the tools or running package installation hooks. Cached archives are verified and reused on later installs.
 - **You choose the dependencies.** YAPP reports runtime requirements and leaves additional installations to you or your agent.
 
 With YAPP installed and on PATH, an agent with shell access can inspect and install a tool:
