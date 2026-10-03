@@ -2,6 +2,26 @@ package catalog
 
 import "testing"
 
+func TestNodeIncludesNPM(t *testing.T) {
+	c, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := c.Apps["node24"]
+	if node.Version != "24.21.0" || node.SemanticVersion != "24.21.0" {
+		t.Fatalf("unexpected Node.js version: %s (%s)", node.Version, node.SemanticVersion)
+	}
+	for _, command := range []string{"bin/node", "bin/npm", "bin/npx"} {
+		found := false
+		for _, linked := range node.LinkedBinaries() {
+			found = found || linked == command
+		}
+		if !found {
+			t.Errorf("Node.js does not expose %s", command)
+		}
+	}
+}
+
 func TestInstallModeValidation(t *testing.T) {
 	for _, tt := range []struct {
 		name   string

@@ -15,9 +15,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sukumaar/yapp/internal/catalog"
+	"github.com/sukumaar/yapp/internal/progressui"
 	"github.com/sukumaar/yapp/internal/state"
 	"github.com/sukumaar/yapp/internal/validation"
 )
@@ -26,11 +28,13 @@ const (
 	maxDownloadSize = 512 << 20
 	maxExtractSize  = 2 << 30
 	maxTarEntries   = 100_000
+	cacheMaxAge     = 30 * 24 * time.Hour
 )
 
 // Install downloads and installs one catalog app under the YAPP home directory.
 // It never executes code from the downloaded archive.
-func Install(ctx context.Context, home string, app catalog.App, artifact catalog.Artifact) (state.Install, string, error) {
+func Install(ctx context.Context, home string, app catalog.App, artifact catalog.Artifact, report progressui.Reporter) (state.Install, string, error) {
+	report("Preparing install directories", 0, 0)
 	if err := ensureRealDir(home, 0o700); err != nil {
 		return state.Install{}, "", err
 	}
@@ -52,11 +56,14 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 	if err := ensureRealDir(cacheDir, 0o700); err != nil {
 		return state.Install{}, "", err
 	}
-	archivePath, checksum, err := download(ctx, cacheDir, artifact)
+	archive, checksum, err := download(ctx, cacheDir, artifact, report)
 	if err != nil {
 		return state.Install{}, "", err
 	}
-	defer os.Remove(archivePath)
+	defer func() {
+		_ = syscall.Flock(int(archive.Fd()), syscall.LOCK_UN)
+		_ = archive.Close()
+	}()
 
 	stage, err := os.MkdirTemp(parent, ".yapp-install-*")
 	if err != nil {
@@ -70,9 +77,11 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 		}
 	}()
 
-	if err := extractTarGzip(archivePath, stage, artifact.StripComponents); err != nil {
+	report("Extracting verified archive", 0, 0)
+	if err := extractTarGzip(archive, stage, artifact.StripComponents, report); err != nil {
 		return state.Install{}, "", fmt.Errorf("extract %s: %w", app.Name, err)
 	}
+	report("Verifying installed executables", 0, 0)
 	for _, executable := range app.Executables {
 		if err := verifyExecutable(filepath.Join(stage, filepath.FromSlash(executable)), executable); err != nil {
 			return state.Install{}, "", err
@@ -83,6 +92,7 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 			return state.Install{}, "", err
 		}
 	}
+	report("Publishing installation", 0, 0)
 	if err := os.Rename(stage, installPath); err != nil {
 		return state.Install{}, "", fmt.Errorf("publish installation: %w", err)
 	}
@@ -107,14 +117,17 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 }
 
 // Uninstall removes only a recorded app directory beneath the YAPP apps tree.
-func Uninstall(home, appID string, install state.Install) error {
+func Uninstall(home string, app catalog.App, install state.Install) error {
 	if err := ensureExistingRealDir(home); err != nil {
 		return err
 	}
-	if !validation.SafeRelativePath(appID) || !validation.SafeRelativePath(install.Path) || !strings.HasPrefix(filepath.ToSlash(install.Path), "apps/"+filepath.ToSlash(appID)+"/") {
+	installRoot := path.Dir(filepath.ToSlash(app.InstallPath))
+	recordedPath := filepath.ToSlash(install.Path)
+	if !validation.SafeRelativePath(app.InstallPath) || !validation.SafeRelativePath(install.Path) ||
+		installRoot != "apps" && !strings.HasPrefix(installRoot, "apps/") || path.Dir(recordedPath) != installRoot {
 		return fmt.Errorf("refusing to uninstall unsafe recorded path %q", install.Path)
 	}
-	components := strings.Split(filepath.ToSlash(install.Path), "/")
+	components := strings.Split(recordedPath, "/")
 	current := home
 	for index, component := range components {
 		current = filepath.Join(current, component)
@@ -142,6 +155,87 @@ func Uninstall(home, appID string, install state.Install) error {
 	return nil
 }
 
+// CleanupCache removes checksum-named archives cached for more than 30 days.
+// Archives currently used by an install are left in place.
+func CleanupCache(ctx context.Context, home string, report func(string)) (int, error) {
+	cacheDir := filepath.Join(home, "cache")
+	cacheInfo, err := os.Lstat(cacheDir)
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("inspect package cache: %w", err)
+	}
+	if !cacheInfo.IsDir() || cacheInfo.Mode()&os.ModeSymlink != 0 {
+		return 0, fmt.Errorf("package cache must be a real directory: %s", cacheDir)
+	}
+	entries, err := os.ReadDir(cacheDir)
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read package cache: %w", err)
+	}
+	removed := 0
+	cutoff := time.Now().Add(-cacheMaxAge)
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return removed, err
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tar.gz") || len(name) != 64+len(".tar.gz") {
+			continue
+		}
+		if _, err := hex.DecodeString(strings.TrimSuffix(name, ".tar.gz")); err != nil {
+			continue
+		}
+		archivePath := filepath.Join(cacheDir, name)
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() || info.ModTime().After(cutoff) {
+			continue
+		}
+		file, err := os.Open(archivePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return removed, fmt.Errorf("open stale cached archive: %w", err)
+		}
+		openedInfo, err := file.Stat()
+		if err != nil || !os.SameFile(info, openedInfo) {
+			_ = file.Close()
+			continue
+		}
+		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			_ = file.Close()
+			if report != nil {
+				report("Skipped cached archive currently in use: " + name)
+			}
+			continue
+		}
+		if err != nil {
+			_ = file.Close()
+			return removed, fmt.Errorf("lock stale cached archive: %w", err)
+		}
+		currentInfo, statErr := file.Stat()
+		if statErr == nil && os.SameFile(info, currentInfo) && !currentInfo.ModTime().After(cutoff) {
+			if err := os.Remove(archivePath); err != nil && !os.IsNotExist(err) {
+				_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+				_ = file.Close()
+				return removed, fmt.Errorf("remove stale cached archive: %w", err)
+			}
+			removed++
+			if report != nil {
+				report("Removed expired cached archive " + name)
+			}
+		}
+		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		_ = file.Close()
+	}
+	return removed, nil
+}
+
 func ensureExistingRealDir(path string) error {
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -153,10 +247,18 @@ func ensureExistingRealDir(path string) error {
 	return nil
 }
 
-func download(ctx context.Context, cacheDir string, artifact catalog.Artifact) (string, string, error) {
+func download(ctx context.Context, cacheDir string, artifact catalog.Artifact, report progressui.Reporter) (*os.File, string, error) {
+	cachedPath := filepath.Join(cacheDir, strings.ToLower(artifact.SHA256)+".tar.gz")
+	if archive, cached, err := openCachedArchive(ctx, cachedPath, artifact.SHA256); err != nil {
+		return nil, "", err
+	} else if cached {
+		report("Using verified cached archive", 0, 0)
+		return archive, strings.ToLower(artifact.SHA256), nil
+	}
+
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, artifact.URL, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("create download request: %w", err)
+		return nil, "", fmt.Errorf("create download request: %w", err)
 	}
 	request.Header.Set("User-Agent", "yapp/"+"dev")
 	client := &http.Client{
@@ -173,63 +275,155 @@ func download(ctx context.Context, cacheDir string, artifact catalog.Artifact) (
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return "", "", fmt.Errorf("download artifact: %w", err)
+		return nil, "", fmt.Errorf("download artifact: %w", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("download artifact: unexpected HTTP status %s", response.Status)
+		return nil, "", fmt.Errorf("download artifact: unexpected HTTP status %s", response.Status)
 	}
 	if response.ContentLength > maxDownloadSize {
-		return "", "", fmt.Errorf("artifact exceeds maximum download size")
+		return nil, "", fmt.Errorf("artifact exceeds maximum download size")
 	}
 
 	file, err := os.CreateTemp(cacheDir, ".yapp-download-*")
 	if err != nil {
-		return "", "", fmt.Errorf("create download file: %w", err)
+		return nil, "", fmt.Errorf("create download file: %w", err)
 	}
 	filePath := file.Name()
 	if err := file.Chmod(0o600); err != nil {
 		_ = file.Close()
 		_ = os.Remove(filePath)
-		return "", "", fmt.Errorf("secure downloaded artifact permissions: %w", err)
+		return nil, "", fmt.Errorf("secure downloaded artifact permissions: %w", err)
 	}
-	keep := false
 	defer func() {
 		_ = file.Close()
-		if !keep {
-			_ = os.Remove(filePath)
-		}
+		_ = os.Remove(filePath)
 	}()
 
 	hasher := sha256.New()
-	bytesWritten, err := io.Copy(io.MultiWriter(file, hasher), io.LimitReader(response.Body, maxDownloadSize+1))
+	report("Downloading artifact", 0, 0)
+	progress := &downloadProgress{report: report, total: response.ContentLength}
+	bytesWritten, err := io.Copy(io.MultiWriter(file, hasher, progress), io.LimitReader(response.Body, maxDownloadSize+1))
 	if err != nil {
-		return "", "", fmt.Errorf("save artifact: %w", err)
+		return nil, "", fmt.Errorf("save artifact: %w", err)
 	}
 	if bytesWritten > maxDownloadSize {
-		return "", "", fmt.Errorf("artifact exceeds maximum download size")
+		return nil, "", fmt.Errorf("artifact exceeds maximum download size")
 	}
+	report("Verifying SHA-256 checksum", 0, 0)
 	if err := file.Sync(); err != nil {
-		return "", "", fmt.Errorf("sync downloaded artifact: %w", err)
+		return nil, "", fmt.Errorf("sync downloaded artifact: %w", err)
 	}
 	if err := file.Close(); err != nil {
-		return "", "", fmt.Errorf("close downloaded artifact: %w", err)
+		return nil, "", fmt.Errorf("close downloaded artifact: %w", err)
 	}
 	actual := hex.EncodeToString(hasher.Sum(nil))
 	if !strings.EqualFold(actual, artifact.SHA256) {
-		return "", "", fmt.Errorf("artifact SHA-256 mismatch: expected %s, got %s", artifact.SHA256, actual)
+		return nil, "", fmt.Errorf("artifact SHA-256 mismatch: expected %s, got %s", artifact.SHA256, actual)
 	}
-	keep = true
-	return filePath, actual, nil
+	if err := os.Rename(filePath, cachedPath); err != nil {
+		return nil, "", fmt.Errorf("save verified archive to cache: %w", err)
+	}
+	if err := syncDirectory(cacheDir); err != nil {
+		return nil, "", fmt.Errorf("sync archive cache: %w", err)
+	}
+	archive, cached, err := openCachedArchive(ctx, cachedPath, artifact.SHA256)
+	if err != nil {
+		return nil, "", err
+	}
+	if !cached {
+		return nil, "", fmt.Errorf("verified archive disappeared from cache")
+	}
+	report("Saved verified archive for future installs", 0, 0)
+	return archive, actual, nil
 }
 
-func extractTarGzip(archivePath, destination string, stripComponents int) error {
-	file, err := os.Open(archivePath)
-	if err != nil {
-		return err
+func openCachedArchive(ctx context.Context, path, expectedSHA256 string) (*os.File, bool, error) {
+	for {
+		info, err := os.Lstat(path)
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, false, fmt.Errorf("cached archive is not a regular file: %s", path)
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, false, err
+		}
+		openedInfo, err := file.Stat()
+		if err != nil || !os.SameFile(info, openedInfo) {
+			_ = file.Close()
+			if err != nil {
+				return nil, false, err
+			}
+			continue
+		}
+
+		err = syscall.Flock(int(file.Fd()), syscall.LOCK_SH|syscall.LOCK_NB)
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			_ = file.Close()
+			select {
+			case <-ctx.Done():
+				return nil, false, ctx.Err()
+			case <-time.After(25 * time.Millisecond):
+				continue
+			}
+		}
+		if err != nil {
+			_ = file.Close()
+			return nil, false, err
+		}
+
+		valid, err := validCachedArchive(file, expectedSHA256)
+		if err == nil && valid {
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
+				_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+				_ = file.Close()
+				return nil, false, err
+			}
+			return file, true, nil
+		}
+		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		_ = file.Close()
+		if err != nil {
+			return nil, false, err
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return nil, false, fmt.Errorf("remove invalid cached archive: %w", err)
+		}
+		return nil, false, nil
 	}
-	defer file.Close()
-	gzipReader, err := gzip.NewReader(file)
+}
+
+func validCachedArchive(file *os.File, expectedSHA256 string) (bool, error) {
+	info, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+	if info.Size() > maxDownloadSize {
+		return false, nil
+	}
+	hasher := sha256.New()
+	read, err := io.Copy(hasher, io.LimitReader(file, maxDownloadSize+1))
+	if err != nil {
+		return false, err
+	}
+	if read > maxDownloadSize {
+		return false, nil
+	}
+	return strings.EqualFold(hex.EncodeToString(hasher.Sum(nil)), expectedSHA256), nil
+}
+
+func extractTarGzip(archive io.Reader, destination string, stripComponents int, report progressui.Reporter) error {
+	gzipReader, err := gzip.NewReader(archive)
 	if err != nil {
 		return fmt.Errorf("open gzip archive: %w", err)
 	}
@@ -248,6 +442,9 @@ func extractTarGzip(archivePath, destination string, stripComponents int) error 
 			return fmt.Errorf("read archive entry: %w", err)
 		}
 		entries++
+		if entries%1000 == 0 {
+			report(fmt.Sprintf("Extracted %d archive entries", entries), 0, 0)
+		}
 		if entries > maxTarEntries {
 			return fmt.Errorf("archive contains too many entries")
 		}
@@ -311,7 +508,35 @@ func extractTarGzip(archivePath, destination string, stripComponents int) error 
 			return fmt.Errorf("set directory permissions: %w", err)
 		}
 	}
+	report(fmt.Sprintf("Extracted %d archive entries", entries), 0, 0)
 	return nil
+}
+
+type downloadProgress struct {
+	report  progressui.Reporter
+	total   int64
+	written int64
+	last    int64
+}
+
+func (p *downloadProgress) Write(data []byte) (int, error) {
+	p.written += int64(len(data))
+	if p.total <= 0 {
+		if p.written-p.last >= 8<<20 {
+			p.last = p.written
+			p.report(fmt.Sprintf("Downloaded %d MiB", p.written>>20), 0, 0)
+		}
+		return len(data), nil
+	}
+	step := p.total / 100
+	if step < 512<<10 {
+		step = 512 << 10
+	}
+	if p.written-p.last >= step || p.written == p.total {
+		p.last = p.written
+		p.report("Downloading artifact", p.written, p.total)
+	}
+	return len(data), nil
 }
 
 func safeArchivePath(name string, stripComponents int) (string, bool, error) {

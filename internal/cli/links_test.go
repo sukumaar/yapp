@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/sukumaar/yapp/internal/catalog"
+	"github.com/sukumaar/yapp/internal/shellenv"
 	"github.com/sukumaar/yapp/internal/state"
 )
 
@@ -54,11 +55,15 @@ func TestExistingInstallLinksAndUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(env), "${YAPP_HOME}/bin") || strings.Contains(string(env), app.InstallPath+"/bin") {
+	if !strings.Contains(string(env), "${YAPP_HOME}/bin") || strings.Contains(string(env), app.InstallPath+"/bin") || !strings.Contains(string(env), "JAVA_HOME") {
 		t.Fatalf("unexpected PATH configuration: %s", env)
 	}
 	if err := Execute(context.Background(), []string{"uninstall", "jdk25"}, &output); err != nil {
 		t.Fatal(err)
+	}
+	env, err = os.ReadFile(filepath.Join(yapp, "yapp-env.sh"))
+	if err != nil || strings.Contains(string(env), "JAVA_HOME") {
+		t.Fatalf("JAVA_HOME remained after uninstall: %s (%v)", env, err)
 	}
 	if _, err := os.Lstat(filepath.Join(yapp, "bin/java")); !os.IsNotExist(err) {
 		t.Fatal("owned link remains")
@@ -76,14 +81,15 @@ func TestSymlinkFalseDoesNotExposeAppPath(t *testing.T) {
 	}
 	c := catalog.Catalog{Apps: map[string]catalog.App{"tool": {InstallMode: &catalog.InstallMode{Symlink: false, Binaries: []string{"bin/tool"}}, Environment: catalog.EnvironmentConfig{Paths: []string{"bin"}}}}}
 	s := state.State{Apps: map[string]state.Install{"tool": {Path: "apps/tool/1"}}}
-	if err := configureShell(home, "bash", c, s); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(home, ".yapp/yapp-env.sh"))
+	variables, paths, err := shellSettings(c, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "apps/tool") {
+	var output bytes.Buffer
+	if err := shellenv.Render(&output, variables, paths); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(output.String(), "apps/tool") {
 		t.Fatal("exposed isolated app through PATH")
 	}
 }

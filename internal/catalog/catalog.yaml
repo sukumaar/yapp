@@ -1,4 +1,25 @@
 apps:
+  node24:
+    name: Node.js
+    version: 24.21.0
+    semantic_version: "24.21.0"
+    release_url: https://nodejs.org/en/download/archive/v24.21.0
+    artifacts:
+      - os: linux
+        arch: amd64
+        format: tar.gz
+        url: https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz
+        sha256: 6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
+        strip_components: 1
+    install_path: apps/node/24.21.0
+    executables:
+      - bin/node
+    install_mode:
+      symlink: true
+      binaries:
+        - bin/node
+        - bin/npm
+        - bin/npx
   jdk25:
     name: Eclipse Temurin JDK 25
     version: 25.0.4.1+1

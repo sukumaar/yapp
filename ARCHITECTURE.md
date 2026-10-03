@@ -47,12 +47,12 @@ YAPP repository/
 
 ~/.yapp/
 ├── .yapp_config           # Local install state (JSON)
-├── yapp-env.sh            # Generated JAVA_HOME and PATH settings
+├── yapp-env.sh            # Generated environment variables and PATH
 ├── apps/                  # YAPP-managed installations
 └── cache/                 # Optional cached downloads
 ```
 
-The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. The initial JDK entry supports Linux amd64 only.
+The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. The JDK, Maven, and Node.js entries currently support Linux amd64 only. Node.js 24.21.0 bundles npm 11.19.0, so both tools install together.
 
 ## Shared app catalog
 
@@ -173,7 +173,7 @@ The proposed install flow is:
 
 YAPP does not install an app's dependencies or reject an app because those apps are absent. After installation, YAPP may check dependency executables and print a `yapp install <app>` suggestion for any missing dependency. It never runs that command itself.
 
-YAPP writes `~/.yapp/yapp-env.sh` with catalog-provided environment variables and the stable `~/.yapp/bin` PATH entry. Legacy per-app PATH entries follow in dependency order. Existing PATH entries are preserved. It adds an idempotent source block to the startup file for the shell named by `$SHELL` (`~/.bashrc` or `~/.zshrc`). Existing users should start a new shell after migrating to clear previously loaded app-specific PATH entries.
+YAPP writes `~/.yapp/yapp-env.sh` from the installed apps' catalog settings after each install or uninstall. The shell startup file sources it directly, so opening a shell does not start YAPP. The file contains catalog-provided environment variables such as `JAVA_HOME`, the shared `~/.yapp/bin` entry, and any legacy per-app PATH entries in dependency order. Existing PATH entries are preserved. Environment-file updates are serialized and atomically replaced.
 
 ## CLI direction
 
