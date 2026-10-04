@@ -1,0 +1,78 @@
+==> Uninstalling Eclipse Temurin JDK 25 25.0.4.1+1
+==> Removing command links
+==> Removing installed files
+==> Removing installation state
+==> Updating shell environment
+==> Uninstalled Eclipse Temurin JDK 25 25.0.4.1+1; shell PATH setup updated
+
+✓ Complete
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/openjdk@25/25.0.4.1... (553 files, 402.0MB)
+Warning: The following may be dbus configuration files and have not been removed!
+If desired, remove them manually with `rm -rf`:
+  /home/linuxbrew/.linuxbrew/etc/dbus-1
+==> Autoremoving 32 unneeded formulae:
+alsa-lib
+cairo
+cups
+dbus
+fontconfig
+freetype
+giflib
+glib
+graphite2
+harfbuzz
+icu4c@78
+jpeg-turbo
+libpng
+libtiff
+libx11
+libxau
+libxcb
+libxcrypt
+libxdmcp
+libxext
+libxfixes
+libxi
+libxrandr
+libxrender
+libxtst
+little-cms2
+lzo
+pcre2
+pixman
+util-linux
+webp
+xorgproto
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/harfbuzz/14.5.1... (103 files, 17.2MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/little-cms2/2.19.1... (24 files, 1.6MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/alsa-lib/1.2.16.1_1... (147 files, 2.4MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxrandr/1.5.5... (28 files, 233KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxtst/1.2.5... (24 files, 144.3KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cups/2.4.19... (122 files, 10MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cairo/1.18.6... (56 files, 5.8MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/graphite2/1.3.15... (19 files, 297.5KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/icu4c@78/78.3... (279 files, 94.4MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libtiff/4.7.2... (495 files, 9.0MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxi/1.8.3... (87 files, 775.9KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/fontconfig/2.18.3... (101 files, 2MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/glib/2.90.0... (509 files, 42.7MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxext/1.3.7... (89 files, 491.6KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxrender/0.9.12... (14 files, 217.4KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/lzo/2.10... (32 files, 668.8KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/pixman/0.46.4... (12 files, 1.8MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/webp/1.6.0... (63 files, 3.3MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxfixes/6.0.2... (14 files, 122.5KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/freetype/2.14.3... (69 files, 3.2MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/giflib/6.1.3... (44 files, 607.6KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/pcre2/10.49... (249 files, 8.4MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/dbus/1.16.2_1... (78 files, 2.1MB)
+
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/util-linux/2.42.4... (461 files, 30.6MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libx11/1.8.13... (1,050 files, 8.2MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/jpeg-turbo/3.2.0... (47 files, 5.9MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libpng/1.6.59... (29 files, 1.5MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxcrypt/4.5.2... (25 files, 368.8KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxcb/1.17.0... (2,498 files, 7.3MB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxau/1.0.12... (22 files, 115.1KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libxdmcp/1.1.5... (12 files, 128.7KB)
+Uninstalling /home/linuxbrew/.linuxbrew/Cellar/xorgproto/2026.1... (268 files, 4.1MB)

@@ -1,0 +1,24 @@
+{
+  "platform": "Linux x86_64",
+  "jdk_version": "25.0.4.1",
+  "runs": [
+    {
+      "tool": "YAPP",
+      "command": "install jdk@25",
+      "seconds": 4.396,
+      "exit_code": 0,
+      "log": "earlier-yapp-attempt.log"
+    },
+    {
+      "tool": "Homebrew",
+      "command": "install openjdk@25",
+      "seconds": 73.992,
+      "exit_code": 1,
+      "jdk_installed": true,
+      "log": "earlier-brew-attempt.log"
+    }
+  ],
+  "homebrew_dependencies": 32,
+  "homebrew_upgrades": 7,
+  "homebrew_error": "Could not link Python's pip3.14 because the target already existed."
+}

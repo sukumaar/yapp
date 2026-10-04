@@ -49,7 +49,7 @@ YAPP repository/
 ├── .yapp_config           # Local install state (JSON)
 ├── yapp-env.sh            # Generated environment variables and PATH
 ├── apps/                  # YAPP-managed installations
-└── cache/                 # Optional cached downloads
+└── cache/                 # Verified downloads named by checksum, app ID, version, and platform
 ```
 
 The catalog is embedded into the YAPP binary at build time. Updating a catalog entry currently requires rebuilding YAPP; a separate catalog refresh command is planned. Current entries support Linux amd64, Linux arm64, and Darwin arm64. Node.js 24.21.0 bundles npm 11.19.0, so both tools install together. Scala 3.9.0 is the current Scala LTS; Python, sbt, Go, and Rust do not designate an LTS release line.
@@ -177,7 +177,7 @@ The proposed install flow is:
 
 1. Load the catalog and validate the requested app and version.
 2. Select the artifact matching the host operating system and architecture.
-3. Download to a temporary/cache location and verify its checksum before extraction.
+3. Download to a temporary file, verify its checksum, and cache it as `<sha256>--<app-id>--<version>.<arch>_<os>.<format>` before extraction. Use catalog values, with `amd64` rendered as `x86_64`.
 4. Install under `~/.yapp` and update `.yapp_config` only after successful installation.
 5. Expose the app's commands through a YAPP-managed directory on `PATH`.
 

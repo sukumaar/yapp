@@ -154,7 +154,7 @@ func installApp(ctx context.Context, args []string, stdout io.Writer) error {
 			return reportDependencyHints(report, yappHome, catalogData, app, current)
 		}
 
-		installRecord, installPath, err := installer.Install(ctx, yappHome, app, artifact, report)
+		installRecord, installPath, err := installer.Install(ctx, yappHome, appID, app, artifact, report)
 		if err != nil {
 			return err
 		}

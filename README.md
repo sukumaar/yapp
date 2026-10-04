@@ -16,6 +16,19 @@ Keep your development setup small and explicit. YAPP gives developers, automatio
 - **Prebuilt tools and reusable downloads.** YAPP extracts verified release archives without compiling the tools or running package installation hooks. Cached archives are verified and reused on later installs.
 - **You choose the dependencies.** YAPP reports runtime requirements and leaves additional installations to you or your agent.
 
+### JDK 25 cold-install benchmark
+
+On this Linux x86_64 machine, a cold install took **4.20 seconds with YAPP versus 59.04 seconds with Homebrew**, about **14× faster** for YAPP.<sup>*</sup>
+
+```text
+YAPP      ███                                        4.20s
+Homebrew  ██████████████████████████████████████████ 59.04s
+```
+
+<sup>*</sup> One successful cold-cache run. Homebrew installed 32 dependencies, included in its time. Both cold-cache runs on this machine installed the same dependencies. The earlier attempt also upgraded seven installed packages, then exited on a Python link conflict after installing the JDK. It is not shown in the graph. This compares complete installs of different JDK distributions and does not isolate Go's contribution. [Earlier attempt and logs](benchmark/earlier-attempt.json)
+
+See the [results](benchmark/results.md), [runner](benchmark/run_benchmark.py), [YAPP log](benchmark/yapp.log), [Homebrew log](benchmark/brew.log), and [cleanup log](benchmark/cleanup.log).
+
 With YAPP installed and on PATH, an agent with shell access can inspect and install a tool:
 
 ```sh
@@ -88,7 +101,7 @@ YAPP checks each download's checksum. The JDK provides `java`, `javac`, `javap`,
 
 The catalog also defines the short aliases `go` → `go@1` and `rust` → `rust@1`. You can install those tools with `yapp install go` or `yapp install rust`; YAPP records each installation under its versioned catalog ID.
 
-Verified download archives stay in `~/.yapp/cache` and are reused on later installs. Before reuse, YAPP hashes the archive contents and compares the result with the catalog SHA-256. If it differs, YAPP deletes the bad archive and downloads it again. After each successful install, YAPP removes cached archives older than 30 days. It skips an archive that an active install is using.
+Verified download archives stay in `~/.yapp/cache` as `<sha256>--<app-id>--<version>.<arch>_<os>.<format>`, for example `<sha256>--jdk@25--25.0.4.1+1.x86_64_linux.tar.gz`. Values come from the catalog, with `amd64` written as `x86_64`. Archives are reused on later installs. Before reuse, YAPP hashes the archive contents and compares the result with the catalog SHA-256. If it differs, YAPP deletes the bad archive and downloads it again. After each successful install, YAPP removes cached archives older than 30 days. It skips an archive that an active install is using.
 
 After installing, open a new terminal or load YAPP's environment into the current shell:
 

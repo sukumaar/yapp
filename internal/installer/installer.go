@@ -33,7 +33,7 @@ const (
 
 // Install downloads and installs one catalog app under the YAPP home directory.
 // It never executes code from the downloaded archive.
-func Install(ctx context.Context, home string, app catalog.App, artifact catalog.Artifact, report progressui.Reporter) (state.Install, string, error) {
+func Install(ctx context.Context, home, appID string, app catalog.App, artifact catalog.Artifact, report progressui.Reporter) (state.Install, string, error) {
 	report("Preparing install directories", 0, 0)
 	if err := ensureRealDir(home, 0o700); err != nil {
 		return state.Install{}, "", err
@@ -56,7 +56,7 @@ func Install(ctx context.Context, home string, app catalog.App, artifact catalog
 	if err := ensureRealDir(cacheDir, 0o700); err != nil {
 		return state.Install{}, "", err
 	}
-	archive, checksum, err := download(ctx, cacheDir, artifact, report)
+	archive, checksum, err := download(ctx, cacheDir, appID, app.Version, artifact, report)
 	if err != nil {
 		return state.Install{}, "", err
 	}
@@ -155,7 +155,7 @@ func Uninstall(home string, app catalog.App, install state.Install) error {
 	return nil
 }
 
-// CleanupCache removes checksum-named archives cached for more than 30 days.
+// CleanupCache removes named package archives cached for more than 30 days.
 // Archives currently used by an install are left in place.
 func CleanupCache(ctx context.Context, home string, report func(string)) (int, error) {
 	cacheDir := filepath.Join(home, "cache")
@@ -183,10 +183,11 @@ func CleanupCache(ctx context.Context, home string, report func(string)) (int, e
 			return removed, err
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".tar.gz") || len(name) != 64+len(".tar.gz") {
+		parts := strings.SplitN(strings.TrimSuffix(name, ".tar.gz"), "--", 3)
+		if !strings.HasSuffix(name, ".tar.gz") || len(parts) != 3 || len(parts[0]) != 64 || parts[1] == "" || parts[2] == "" {
 			continue
 		}
-		if _, err := hex.DecodeString(strings.TrimSuffix(name, ".tar.gz")); err != nil {
+		if _, err := hex.DecodeString(parts[0]); err != nil {
 			continue
 		}
 		archivePath := filepath.Join(cacheDir, name)
@@ -247,8 +248,16 @@ func ensureExistingRealDir(path string) error {
 	return nil
 }
 
-func download(ctx context.Context, cacheDir string, artifact catalog.Artifact, report progressui.Reporter) (*os.File, string, error) {
-	cachedPath := filepath.Join(cacheDir, strings.ToLower(artifact.SHA256)+".tar.gz")
+func download(ctx context.Context, cacheDir, appID, version string, artifact catalog.Artifact, report progressui.Reporter) (*os.File, string, error) {
+	arch := artifact.Arch
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
+	name := fmt.Sprintf("%s--%s--%s.%s_%s.%s", strings.ToLower(artifact.SHA256), appID, version, arch, artifact.OS, artifact.Format)
+	if filepath.Base(name) != name || !validation.SafeRelativePath(strings.ReplaceAll(name, "@", "-")) {
+		return nil, "", fmt.Errorf("unsafe cache filename in catalog: %q", name)
+	}
+	cachedPath := filepath.Join(cacheDir, name)
 	if archive, cached, err := openCachedArchive(ctx, cachedPath, artifact.SHA256); err != nil {
 		return nil, "", err
 	} else if cached {

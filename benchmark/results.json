@@ -1,0 +1,26 @@
+{
+  "platform": "Linux-6.12.86+deb13-amd64-x86_64-with-glibc2.41",
+  "architecture": "x86_64",
+  "jdk_version": "25.0.4.1+1",
+  "homebrew_jdk_version": "25.0.4.1",
+  "cache": "No cached YAPP JDK archive and fresh temporary HOMEBREW_CACHE",
+  "homebrew_dependencies": 32,
+  "runs": [
+    {
+      "tool": "YAPP",
+      "command": "install jdk@25",
+      "seconds": 4.197,
+      "exit_code": 0
+    },
+    {
+      "tool": "Homebrew",
+      "command": "install openjdk@25",
+      "seconds": 59.042,
+      "exit_code": 0
+    }
+  ],
+  "cleanup_exit_codes": [
+    0,
+    0
+  ]
+}

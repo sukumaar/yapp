@@ -1,0 +1,17 @@
+==> Installing Eclipse Temurin JDK 25 25.0.4.1+1
+==> Preparing install directories
+==> Downloading artifact
+6.86 MiB / 134.78 MiB  515.04 MiB / 134.78 MiB  24.60 MiB / 134.78 MiB  34.17 MiB / 134.78 MiB  46.44 MiB / 134.78 MiB  60.08 MiB / 134.78 MiB  66.96 MiB / 134.78 MiB  79.25 MiB / 134.78 MiB  88.77 MiB / 134.78 MiB  98.33 MiB / 134.78 MiB  107.89 MiB / 134.78 MiB 118.80 MiB / 134.78 MiB 129.74 MiB / 134.78 MiB 134.78 MiB / 134.78 MiB ==> Verifying SHA-256 checksum
+==> Saved verified archive for future installs
+==> Extracting verified archive
+==> Extracted 486 archive entries
+==> Verifying installed executables
+==> Publishing installation
+==> Recording installation state
+==> Creating command links
+==> Updating shell environment
+==> Installed Eclipse Temurin JDK 25 25.0.4.1+1 at /home/superuser/.yapp/apps/jdk/25.0.4.1+1. Reload ~/.bashrc for initial setup or changed environment variables
+
+✓ Complete
+==> Checking package cache (archives older than 30 days expire).
+    No expired cached archives removed.
