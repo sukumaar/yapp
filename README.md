@@ -11,6 +11,7 @@ Setup supports Bash and Zsh in macOS and Linux.
 Keep your development setup small and explicit. YAPP gives developers, automation scripts, and AI coding agents a single CLI for installing supported runtimes, SDKs, and build tools.
 
 - **Compiled Go CLI.** YAPP runs as a single binary. New shells source the generated environment file without launching YAPP.
+- **Quick tool setup for agents.** A coding agent can install a supported tool with one command, without waiting through a long package-manager dependency setup. The JDK benchmark below measured a 4.20-second cold install on this machine. YAPP's lightweight installer may also help keep setup overhead low, though this benchmark measured install time, not memory use.
 - **Your toolchain, in your home.** Tools and cached downloads live under `~/.yapp`, with no sudo required for installation.
 - **Versions fixed by the catalog.** Each YAPP build bundles exact releases and SHA-256 checksums, so fresh installs use that build's chosen versions.
 - **Prebuilt tools and reusable downloads.** YAPP extracts verified release archives without compiling the tools or running package installation hooks. Cached archives are verified and reused on later installs.
@@ -18,14 +19,14 @@ Keep your development setup small and explicit. YAPP gives developers, automatio
 
 ### JDK 25 cold-install benchmark
 
-On this Linux x86_64 machine, a cold install took **4.20 seconds with YAPP versus 59.04 seconds with Homebrew**, about **14× faster** for YAPP.<sup>*</sup>
+On this Linux x86_64 machine, a cold install took **4.20 seconds with YAPP versus 59.04 seconds with Homebrew**, about **14× faster** for YAPP.[^benchmark]
 
 ```text
 YAPP      ███                                        4.20s
 Homebrew  ██████████████████████████████████████████ 59.04s
 ```
 
-<sup>*</sup> One successful cold-cache run. Homebrew installed 32 dependencies, included in its time. Both cold-cache runs on this machine installed the same dependencies. The earlier attempt also upgraded seven installed packages, then exited on a Python link conflict after installing the JDK. It is not shown in the graph. This compares complete installs of different JDK distributions and does not isolate Go's contribution. [Earlier attempt and logs](benchmark/earlier-attempt.json)
+[^benchmark]: One successful cold-cache run. Homebrew installed 32 dependencies, included in its time; both cold-cache runs installed the same dependencies. An earlier attempt upgraded seven packages and then exited on a Python link conflict after installing the JDK, so it is not shown in the graph. This compares complete installs of different JDK distributions and does not isolate Go's contribution. [Earlier attempt and logs](benchmark/earlier-attempt.json).
 
 See the [results](benchmark/results.md), [runner](benchmark/run_benchmark.py), [YAPP log](benchmark/yapp.log), [Homebrew log](benchmark/brew.log), and [cleanup log](benchmark/cleanup.log).
 
